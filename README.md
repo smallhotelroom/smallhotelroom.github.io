@@ -1,0 +1,1 @@
+# smallhotelroom.github.io
