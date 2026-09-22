@@ -1,0 +1,21 @@
+{
+  "name": "Small Hotel Room",
+  "short_name": "SHR Music",
+  "description": "The official website of Small Hotel Room",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#1e1e1e",
+  "icons": [
+    {
+      "src": "/img/shr-120-120.png",
+      "sizes": "120x120",
+      "type": "image/png"
+    },
+    {
+      "src": "/img/shr-2000-324.png",
+      "sizes": "2000x324",
+      "type": "image/png"
+    }
+  ]
+}

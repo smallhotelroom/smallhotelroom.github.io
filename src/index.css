@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors extracted from your original CSS */
+  --color-shr-green: #569400; /* */
+  --color-shr-green-hover: #457a00;
+  --color-shr-dark-start: rgba(80, 80, 80, 0.97); /* */
+  --color-shr-dark-end: rgba(30, 30, 30, 0.97); /* */
+
+  /* Backgrounds and Gradients extracted from your original CSS */
+  --background-image-shr-body: url('/img/img01.gif'); /* */
+  --background-image-shr-gradient-nav: linear-gradient(0deg, rgba(80,80,80,0.97) 0%, rgba(30,30,30,0.97) 100%); /* */
+  --background-image-shr-gradient-footer: linear-gradient(0deg, rgba(30,30,30,0.97) 0%, rgba(80,80,80,0.97) 100%); /* */
+  --background-image-shr-gradient-container: linear-gradient(0deg, rgba(230,230,230,1) 0%, rgba(207,207,207,1) 100%); /* */
+}
