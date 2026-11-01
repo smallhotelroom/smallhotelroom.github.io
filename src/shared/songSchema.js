@@ -1,9 +1,10 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 1.7.0
+ * @version 2.0.0
+ * Single Source of Truth for Frontmatter Schema AND Inline Chord Notation Grammar.
  */
 
-export const __version__ = '1.7.0';
+export const __version__ = '2.0.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -12,7 +13,6 @@ export const STRICT_PROJECT_NAMES = [
   "cancionesdejuan"
 ];
 
-// Added 'bpm' to the strict requirements
 export const STRICT_PROJECT_KEYS = [
   "album", 
   "author",
@@ -26,7 +26,6 @@ export const STRICT_PROJECT_KEYS = [
   "url"
 ];
 
-// All recognized frontmatter keys across official and curated songs
 export const TREATED_KEYS = [
   "album",
   "artist",
@@ -51,6 +50,53 @@ export const TREATED_KEYS = [
   "writer",
   "youtube"
 ];
+
+// --- INLINE CHORD NOTATION GRAMMAR ---
+export const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+export const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+export const NOTE_TO_SEMITONE = {
+  C: 0,
+  'B#': 0,
+  'C#': 1,
+  Db: 1,
+  D: 2,
+  'D#': 3,
+  Eb: 3,
+  E: 4,
+  Fb: 4,
+  F: 5,
+  'E#': 5,
+  'F#': 6,
+  Gb: 6,
+  G: 7,
+  'G#': 8,
+  Ab: 8,
+  A: 9,
+  'A#': 10,
+  Bb: 10,
+  B: 11,
+  Cb: 11,
+};
+
+// Parenthetical metadata/directives that should never be transposed as chords
+export const SKIP_PAREN_PREFIXES = [
+  '(bpm',
+  '(tempo',
+  '(key',
+  '(highest',
+  '(falsetto',
+  '(all',
+  '(chords for',
+];
+
+// Delimiters & playing annotations allowed inside (...) chord blocks
+export const CHORD_GROUP_DELIMITER_REGEX =
+  /  |_|!|\.\.\.|\.\.|: |\*|high|open|bass|riff|palm mute|notes|sus4/;
+
+// Allowed chord quality/modifier suffixes after the root note (e.g. m, maj7, dim, add9, 7b5)
+export const CHORD_QUALITY_REGEX =
+  /^(?:m|maj|min|dim|aug|sus|add|[0-9]|[#b+-]|M|\(|\))*$/i;
 
 export const validateAlphabeticalOrder = (keys) => {
   const sortedKeys = [...keys].sort();
@@ -96,11 +142,6 @@ export const validateFrontmatter = (frontmatterData, rawFileName = "") => {
   return errors;
 };
 
-/**
- * Dependency-free YAML frontmatter parser that handles scalar values, flat lists (`musicians`),
- * and nested object lists (`downloads`, even when `- label:` is at column 0),
- * while recording exact 1-based line numbers (`keyLines`) for every top-level key.
- */
 export const parseFrontmatterFile = (rawText) => {
   const normalized = String(rawText || '').replace(/\r\n/g, '\n');
   if (!normalized.startsWith('---\n')) {
