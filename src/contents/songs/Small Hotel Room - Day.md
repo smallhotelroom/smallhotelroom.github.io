@@ -69,7 +69,8 @@ No puedo sufrir, no estoy - vivo
 Pequeños mares, inundan tus ojos,
 y desde debajo, los techos se elevan,
 El viento sopla fuerte, las velas están llenas,
-me hundiría aquí de por siempre jamás (x2)
+me hundiría aquí de por siempre jamás
+me hundiría aquí de por siempre jamás
 
 ¿No te quedarás hasta el final de la mañana?
 ¿No te quedarás hasta el final del  día...?
@@ -77,7 +78,8 @@ me hundiría aquí de por siempre jamás (x2)
 Así que nadie te preguntó por tu discurso
 Así que nadie escuchó tan siquiera una palabra
 Vendería mi alma
-y luego volvería a tí (x2)
+y luego volvería a tí
+y luego volvería a tí
 
 [instrumental]
 
@@ -85,7 +87,8 @@ Pequeños mares, inundan tus ojos,
 y desde debajo, los techos se elevan,
 El viento sopla fuerte, las velas están llenas,
 me hundiría aquí de por siempre jamás
-Hambriento de corazón.. (x2)
+Hambriento de corazón..
+Hambriento de corazón..
 
 ¿No te quedarás hasta el final de la mañana?
 ¿No te quedarás hasta el final del  día...?
