@@ -9,7 +9,7 @@ license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 musicians: Juan G Victores (Voice, Guitars), Paco Dicenta (Bass Guitar, Mixing, Mastering),
   David Outumuro (Drums)
 spotify: 3cKKjcSJiPQGYnhSlUrloy
-time_signature: 244
+time_signature: 4/4
 track: 6
 url: https://smallhotelroom.com
 youtube: DC7btVEhGA8
