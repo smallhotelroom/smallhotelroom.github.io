@@ -1,10 +1,11 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.0.0
- * Single Source of Truth for Frontmatter Schema AND Inline Chord Notation Grammar.
+ * @version 2.1.0
+ * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
+ * and Syntax Highlighting Color Palettes (shared by VS Code Linter, Acordismo App, and Web).
  */
 
-export const __version__ = '2.0.0';
+export const __version__ = '2.1.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -97,6 +98,26 @@ export const CHORD_GROUP_DELIMITER_REGEX =
 // Allowed chord quality/modifier suffixes after the root note (e.g. m, maj7, dim, add9, 7b5)
 export const CHORD_QUALITY_REGEX =
   /^(?:m|maj|min|dim|aug|sus|add|[0-9]|[#b+-]|M|\(|\))*$/i;
+
+// --- SHARED SYNTAX HIGHLIGHTING PALETTE (Linter + SongScreen) ---
+export const SYNTAX_PALETTE = {
+  dark: {
+    parenBg: 'rgba(121, 192, 255, 0.06)',
+    parenSymbol: '#d29922', // Warm gold for '(' and ')' symbols
+    chord: '#79c0ff',       // Dark 2026 cool sky-blue for chord tokens
+    modifier: '#d29922',    // Warm gold for '!', '_', 'riff', 'palm mute', etc.
+    directive: '#b392f0',   // Soft lavender for '(capo ...)', '(drop ...)', '(bpm ...)'
+    choir: '#7ee787',       // Soft sage green for '[choir]'
+  },
+  light: {
+    parenBg: 'rgba(9, 105, 218, 0.06)',
+    parenSymbol: '#b45309', // Crisp warm amber/gold for '(' and ')' on light background
+    chord: '#0969da',       // Crisp royal blue for chord tokens on light background
+    modifier: '#b45309',    // Crisp warm amber/gold for modifiers
+    directive: '#6e40c9',   // Deep purple for directives
+    choir: '#1a7f37',       // Deep forest green for '[choir]'
+  },
+};
 
 export const validateAlphabeticalOrder = (keys) => {
   const sortedKeys = [...keys].sort();
