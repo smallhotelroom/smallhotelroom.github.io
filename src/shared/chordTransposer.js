@@ -1,6 +1,6 @@
 /**
  * @file src/shared/chordTransposer.js (in smallhotelroom.github.io)
- * @version 4.0.0
+ * @version 4.1.0
  */
 import {
     SHARP_NOTES,
@@ -9,9 +9,10 @@ import {
     SKIP_PAREN_PREFIXES,
     CHORD_GROUP_DELIMITER_REGEX,
     CHORD_QUALITY_REGEX,
+    SYNTAX_PALETTE,
 } from './songSchema.js';
 
-export const __version__ = '4.0.0';
+export const __version__ = '4.1.0';
 
 export {
     SHARP_NOTES,
@@ -20,6 +21,7 @@ export {
     SKIP_PAREN_PREFIXES,
     CHORD_GROUP_DELIMITER_REGEX,
     CHORD_QUALITY_REGEX,
+    SYNTAX_PALETTE,
 };
 
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
