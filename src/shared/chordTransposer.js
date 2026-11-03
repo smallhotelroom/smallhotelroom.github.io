@@ -1,6 +1,6 @@
 /**
  * @file src/shared/chordTransposer.js (in smallhotelroom.github.io)
- * @version 4.3.0
+ * @version 4.4.0
  */
 import {
     SHARP_NOTES,
@@ -13,7 +13,7 @@ import {
     SYNTAX_PALETTE,
 } from './songSchema.js';
 
-export const __version__ = '4.3.0';
+export const __version__ = '4.4.0';
 
 export {
     SHARP_NOTES,
@@ -79,29 +79,84 @@ export function parseChordToken(token) {
 }
 
 /**
- * Returns true if `lineText` contains at least one token and EVERY whitespace-separated
- * token on the line is a valid musical chord (used for OrigenZK / OrigenLK crawler songs).
+ * Checks if the inside of a `(...)` group in curated or crawler songs actually contains
+ * valid chords (and not tab harmonics like `(12)` or lyric remarks like `(coro)`).
  */
-export function isStandaloneChordLine(lineText) {
+export function isValidParenChordGroup(innerStr) {
+    if (!innerStr || typeof innerStr !== 'string') {
+        return false;
+    }
+    if (DIRECTIVE_PAREN_REGEX.test(innerStr)) {
+        return false;
+    }
+    const tokens = innerStr.split(CHORD_GROUP_DELIMITER_REGEX);
+    let chordCount = 0;
+    for (const rawTok of tokens) {
+        const trimmed = rawTok.trim();
+        if (!trimmed) continue;
+        if (parseChordToken(trimmed) !== null) {
+            chordCount++;
+        } else {
+            return false;
+        }
+    }
+    return chordCount > 0;
+}
+
+/**
+ * Returns true if `lineText` is a chord line (whether chords are bare, wrapped in parentheses,
+ * or accompanied by repeat markers like `x2` / `x4`), while rejecting ASCII guitar tab lines
+ * like `e|---(12)---|` and lyric lines.
+ */
+export function isCrawlerChordLine(lineText) {
     if (!lineText || typeof lineText !== 'string') {
         return false;
     }
     const trimmed = lineText.trim();
-    if (!trimmed || trimmed.includes('(') || trimmed.includes(')') || trimmed.includes('[')) {
+    if (!trimmed || trimmed.includes('[') || trimmed.includes(']')) {
         return false;
     }
-    const tokens = trimmed.split(/\s+/);
-    if (tokens.length === 0) {
+    // Reject ASCII tablature lines (e.g. "e|---(12)---|" or "----12----")
+    if (trimmed.includes('--') || /[eBGDAE]\|/.test(trimmed)) {
         return false;
     }
-    return tokens.every((tok) => parseChordToken(tok) !== null);
+
+    // Strip parentheses so both "Am  F  C  G" and "(Am  F)  C  (G)" can be evaluated token-by-token
+    const withoutParens = trimmed.replace(/[()]/g, ' ').trim();
+    if (!withoutParens) {
+        return false;
+    }
+
+    const tokens = withoutParens.split(/\s+/);
+    let validChordCount = 0;
+
+    for (const tok of tokens) {
+        if (parseChordToken(tok) !== null) {
+            validChordCount++;
+        } else if (/^(?:x\d+|\d+x|\|)$/i.test(tok)) {
+            // Allow repeat markers like x2, x4, 2x, or barline | on a chord line
+            continue;
+        } else {
+            return false;
+        }
+    }
+
+    return validChordCount > 0;
 }
 
+export const isStandaloneChordLine = isCrawlerChordLine;
+
 /**
- * Transposes a standalone chord line while preserving exact whitespace alignment above lyrics.
+ * Transposes any chord line (with or without parentheses) by replacing each valid chord token
+ * in-place while preserving all whitespace, parentheses, and repeat markers (`x2`).
  */
 export function transposeStandaloneChordLine(lineText, semitones = 0, useFlats = false) {
-    return lineText.replace(/\S+/g, (tok) => transposeChordToken(tok, semitones, useFlats));
+    return lineText.replace(/([A-G][#b]?[^\s()]*)/g, (candidate) => {
+        if (parseChordToken(candidate) !== null) {
+            return transposeChordToken(candidate, semitones, useFlats);
+        }
+        return candidate;
+    });
 }
 
 function evaluatePaletteCollisions(palette, pitchClassCounts, rootPitchClassSet) {
@@ -141,12 +196,17 @@ function evaluatePaletteCollisions(palette, pitchClassCounts, rootPitchClassSet)
     };
 }
 
-export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = null) {
+/**
+ * Internal analyzer shared by `deduceSongUseFlats` and `deduceSongKey`.
+ */
+function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
     const pitchClassCounts = new Map();
     const rootPitchClassSet = new Set();
     const chordQualities = [];
     let originalFlatsCount = 0;
     let originalSharpsCount = 0;
+    let firstChord = null;
+    let lastChord = null;
 
     const addPitchClass = (pc, weight = 1, isRoot = true) => {
         pitchClassCounts.set(pc, (pitchClassCounts.get(pc) || 0) + weight);
@@ -170,7 +230,10 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
 
         const transposedRoot = mod12(parsed.rootSemitone + semitones);
         addPitchClass(transposedRoot, 2, true);
-        chordQualities.push({ rootPc: transposedRoot, isMinor: parsed.isMinor });
+        const cq = { rootPc: transposedRoot, isMinor: parsed.isMinor };
+        chordQualities.push(cq);
+        if (!firstChord) firstChord = cq;
+        lastChord = cq;
 
         if (parsed.bassSemitone !== null) {
             const transposedBass = mod12(parsed.bassSemitone + semitones);
@@ -178,30 +241,88 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
         }
     };
 
-    // 1. Scan parenthetical (...) chord groups
-    const parenRegex = /\(([^)]+)\)/g;
-    let match;
-    while ((match = parenRegex.exec(lyrics)) !== null) {
-        if (DIRECTIVE_PAREN_REGEX.test(match[1])) {
-            continue;
-        }
-
-        const tokens = match[1].split(CHORD_GROUP_DELIMITER_REGEX);
-        for (const rawTok of tokens) {
-            recordParsedChord(parseChordToken(rawTok));
-        }
-    }
-
-    // 2. If no parenthetical chords were found (e.g. OrigenZK / OrigenLK), scan standalone chord lines
-    if (pitchClassCounts.size === 0) {
-        for (const line of String(lyrics).split('\n')) {
-            if (isStandaloneChordLine(line)) {
-                for (const rawTok of line.trim().split(/\s+/)) {
+    // Scan lines for both crawler chord lines and valid (...) chord groups
+    for (const line of String(lyrics).split('\n')) {
+        if (isCrawlerChordLine(line)) {
+            const cleaned = line.replace(/[()]/g, ' ').trim();
+            for (const rawTok of cleaned.split(/\s+/)) {
+                recordParsedChord(parseChordToken(rawTok));
+            }
+        } else {
+            const parenRegex = /\(([^)]+)\)/g;
+            let match;
+            while ((match = parenRegex.exec(line)) !== null) {
+                if (!isValidParenChordGroup(match[1])) {
+                    continue;
+                }
+                const tokens = match[1].split(CHORD_GROUP_DELIMITER_REGEX);
+                for (const rawTok of tokens) {
                     recordParsedChord(parseChordToken(rawTok));
                 }
             }
         }
     }
+
+    let bestMajorTonic = 0;
+    let bestScore = -Infinity;
+
+    for (let tonic = 0; tonic < 12; tonic++) {
+        const scaleSet = new Set(MAJOR_SCALE_INTERVALS.map((i) => mod12(tonic + i)));
+        let score = 0;
+
+        for (const [pc, count] of pitchClassCounts.entries()) {
+            if (scaleSet.has(pc)) {
+                score += count * 3;
+            }
+        }
+
+        for (const cq of chordQualities) {
+            const rel = mod12(cq.rootPc - tonic);
+            if (rel === 0 && !cq.isMinor) score += 4;
+            if (rel === 5 && !cq.isMinor) score += 2;
+            if (rel === 7 && !cq.isMinor) score += 3;
+            if (rel === 9 && cq.isMinor) score += 4;
+            if (rel === 2 && cq.isMinor) score += 2;
+            if (rel === 4 && cq.isMinor) score += 2;
+        }
+
+        if (firstChord) {
+            if (firstChord.rootPc === tonic && !firstChord.isMinor) score += 6;
+            if (firstChord.rootPc === mod12(tonic + 9) && firstChord.isMinor) score += 6;
+        }
+        if (lastChord) {
+            if (lastChord.rootPc === tonic && !lastChord.isMinor) score += 6;
+            if (lastChord.rootPc === mod12(tonic + 9) && lastChord.isMinor) score += 6;
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMajorTonic = tonic;
+        }
+    }
+
+    return {
+        pitchClassCounts,
+        rootPitchClassSet,
+        chordQualities,
+        originalFlatsCount,
+        originalSharpsCount,
+        firstChord,
+        lastChord,
+        bestMajorTonic,
+        songKeyHint,
+        semitones,
+    };
+}
+
+export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = null) {
+    const {
+        pitchClassCounts,
+        rootPitchClassSet,
+        originalFlatsCount,
+        originalSharpsCount,
+        bestMajorTonic,
+    } = analyzeSongHarmony(lyrics, semitones, songKeyHint);
 
     const hasBlackKeys = [...pitchClassCounts.keys()].some((pc) =>
         [1, 3, 6, 8, 10].includes(pc)
@@ -247,39 +368,10 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
         }
     }
 
-    let bestTonic = 0;
-    let bestScore = -Infinity;
-
-    for (let tonic = 0; tonic < 12; tonic++) {
-        const scaleSet = new Set(MAJOR_SCALE_INTERVALS.map((i) => mod12(tonic + i)));
-        let score = 0;
-
-        for (const [pc, count] of pitchClassCounts.entries()) {
-            if (scaleSet.has(pc)) {
-                score += count * 3;
-            }
-        }
-
-        for (const cq of chordQualities) {
-            const rel = mod12(cq.rootPc - tonic);
-            if (rel === 0 && !cq.isMinor) score += 4;
-            if (rel === 5 && !cq.isMinor) score += 2;
-            if (rel === 7 && !cq.isMinor) score += 3;
-            if (rel === 9 && cq.isMinor) score += 4;
-            if (rel === 2 && cq.isMinor) score += 2;
-            if (rel === 4 && cq.isMinor) score += 2;
-        }
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestTonic = tonic;
-        }
-    }
-
-    if (FLAT_TONICS.has(bestTonic)) {
+    if (FLAT_TONICS.has(bestMajorTonic)) {
         return true;
     }
-    if (SHARP_TONICS.has(bestTonic)) {
+    if (SHARP_TONICS.has(bestMajorTonic)) {
         return false;
     }
 
@@ -289,6 +381,59 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
         (pitchClassCounts.get(6) || 0) + (pitchClassCounts.get(1) || 0);
 
     return flatSignatureWeight > sharpSignatureWeight;
+}
+
+/**
+ * Deduces the musical key of a song (e.g. "Em", "G", "F#m") from its chords.
+ * Decides between the best Major tonic (I) and its relative Minor tonic (vi)
+ * based on occurrence counts and opening/closing chord resolution.
+ */
+export function deduceSongKey(lyrics = '', semitones = 0, songKeyHint = null) {
+    const useFlats = deduceSongUseFlats(lyrics, semitones, songKeyHint);
+    const palette = useFlats ? FLAT_NOTES : SHARP_NOTES;
+
+    if (songKeyHint && typeof songKeyHint === 'string') {
+        const parsedHint = parseChordToken(songKeyHint.trim());
+        if (parsedHint) {
+            const newRoot = palette[mod12(parsedHint.rootSemitone + semitones)];
+            return `${newRoot}${parsedHint.isMinor ? 'm' : ''}`;
+        }
+    }
+
+    const { chordQualities, firstChord, lastChord, bestMajorTonic } = analyzeSongHarmony(
+        lyrics,
+        semitones,
+        null
+    );
+
+    if (chordQualities.length === 0) {
+        return null;
+    }
+
+    const relMinorTonic = mod12(bestMajorTonic + 9);
+    let majorWeight = 0;
+    let minorWeight = 0;
+
+    for (const cq of chordQualities) {
+        if (cq.rootPc === bestMajorTonic && !cq.isMinor) majorWeight += 3;
+        if (cq.rootPc === relMinorTonic && cq.isMinor) minorWeight += 3;
+        // V7 or V of relative minor (e.g. E or E7 in Am) strongly signals minor key
+        if (cq.rootPc === mod12(relMinorTonic + 7) && !cq.isMinor) minorWeight += 2;
+    }
+
+    if (firstChord) {
+        if (firstChord.rootPc === bestMajorTonic && !firstChord.isMinor) majorWeight += 5;
+        if (firstChord.rootPc === relMinorTonic && firstChord.isMinor) minorWeight += 5;
+    }
+    if (lastChord) {
+        if (lastChord.rootPc === bestMajorTonic && !lastChord.isMinor) majorWeight += 5;
+        if (lastChord.rootPc === relMinorTonic && lastChord.isMinor) minorWeight += 5;
+    }
+
+    if (minorWeight > majorWeight) {
+        return `${palette[relMinorTonic]}m`;
+    }
+    return palette[bestMajorTonic];
 }
 
 export function transposeChordToken(token, semitones = 0, useFlats = null) {
@@ -323,7 +468,7 @@ export function transposeChordToken(token, semitones = 0, useFlats = null) {
 }
 
 export function transposeChordGroupInner(chordGroupInner, semitones = 0, useFlats = false) {
-    if (DIRECTIVE_PAREN_REGEX.test(chordGroupInner)) {
+    if (!isValidParenChordGroup(chordGroupInner)) {
         return chordGroupInner;
     }
 
@@ -358,44 +503,48 @@ export function transposeSongContents(
         globalSemitones + (applyCapoDropCorrection ? Number(frontmatterCapo || 0) : 0);
     const useFlats = deduceSongUseFlats(contents, songHalfTones, songKeyHint);
 
-    const afterParens = contents.replace(/\(([^)]*)\)/g, (fullMatch, inner) => {
-        const lower = fullMatch.toLowerCase();
-        if (SKIP_PAREN_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
-            return fullMatch;
-        }
-        if (lower.includes('capo')) {
-            if (applyCapoDropCorrection) {
-                const nums = fullMatch.match(/\d+/g);
-                if (nums && nums.length === 1) {
-                    songHalfTones += parseInt(nums[0], 10);
-                    return `(chords for no capo; generated from ${inner})`;
-                }
-            }
-            return fullMatch;
-        }
-        if (lower.includes('drop')) {
-            if (applyCapoDropCorrection) {
-                const nums = fullMatch.match(/\d+/g);
-                if (nums && nums.length === 1) {
-                    songHalfTones -= parseInt(nums[0], 10);
-                    return `(chords for no drop; generated from ${inner})`;
-                }
-            }
-            return fullMatch;
-        }
-
-        const currentUseFlats =
-            deduceSongUseFlats(contents, songHalfTones, songKeyHint) ?? useFlats;
-        return `(${transposeChordGroupInner(inner, songHalfTones, currentUseFlats)})`;
-    });
-
-    // Also transpose standalone chord lines (OrigenZK / OrigenLK)
-    return afterParens
+    return String(contents || '')
         .split('\n')
-        .map((line) =>
-            isStandaloneChordLine(line)
-                ? transposeStandaloneChordLine(line, songHalfTones, useFlats)
-                : line
-        )
+        .map((line) => {
+            if (isCrawlerChordLine(line) && !line.includes('(')) {
+                return transposeStandaloneChordLine(line, songHalfTones, useFlats);
+            }
+            if (isCrawlerChordLine(line) && line.includes('(')) {
+                return transposeStandaloneChordLine(line, songHalfTones, useFlats);
+            }
+            return line.replace(/\(([^)]*)\)/g, (fullMatch, inner) => {
+                const lower = fullMatch.toLowerCase();
+                if (SKIP_PAREN_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
+                    return fullMatch;
+                }
+                if (lower.includes('capo')) {
+                    if (applyCapoDropCorrection) {
+                        const nums = fullMatch.match(/\d+/g);
+                        if (nums && nums.length === 1) {
+                            songHalfTones += parseInt(nums[0], 10);
+                            return `(chords for no capo; generated from ${inner})`;
+                        }
+                    }
+                    return fullMatch;
+                }
+                if (lower.includes('drop')) {
+                    if (applyCapoDropCorrection) {
+                        const nums = fullMatch.match(/\d+/g);
+                        if (nums && nums.length === 1) {
+                            songHalfTones -= parseInt(nums[0], 10);
+                            return `(chords for no drop; generated from ${inner})`;
+                        }
+                    }
+                    return fullMatch;
+                }
+                if (!isValidParenChordGroup(inner)) {
+                    return fullMatch;
+                }
+
+                const currentUseFlats =
+                    deduceSongUseFlats(contents, songHalfTones, songKeyHint) ?? useFlats;
+                return `(${transposeChordGroupInner(inner, songHalfTones, currentUseFlats)})`;
+            });
+        })
         .join('\n');
 }
