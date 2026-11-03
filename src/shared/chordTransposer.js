@@ -1,6 +1,6 @@
 /**
  * @file src/shared/chordTransposer.js (in smallhotelroom.github.io)
- * @version 4.2.0
+ * @version 4.3.0
  */
 import {
     SHARP_NOTES,
@@ -13,7 +13,7 @@ import {
     SYNTAX_PALETTE,
 } from './songSchema.js';
 
-export const __version__ = '4.2.0';
+export const __version__ = '4.3.0';
 
 export {
     SHARP_NOTES,
@@ -78,6 +78,32 @@ export function parseChordToken(token) {
     };
 }
 
+/**
+ * Returns true if `lineText` contains at least one token and EVERY whitespace-separated
+ * token on the line is a valid musical chord (used for OrigenZK / OrigenLK crawler songs).
+ */
+export function isStandaloneChordLine(lineText) {
+    if (!lineText || typeof lineText !== 'string') {
+        return false;
+    }
+    const trimmed = lineText.trim();
+    if (!trimmed || trimmed.includes('(') || trimmed.includes(')') || trimmed.includes('[')) {
+        return false;
+    }
+    const tokens = trimmed.split(/\s+/);
+    if (tokens.length === 0) {
+        return false;
+    }
+    return tokens.every((tok) => parseChordToken(tok) !== null);
+}
+
+/**
+ * Transposes a standalone chord line while preserving exact whitespace alignment above lyrics.
+ */
+export function transposeStandaloneChordLine(lineText, semitones = 0, useFlats = false) {
+    return lineText.replace(/\S+/g, (tok) => transposeChordToken(tok, semitones, useFlats));
+}
+
 function evaluatePaletteCollisions(palette, pitchClassCounts, rootPitchClassSet) {
     const letterToPitchClasses = new Map();
     const letterToTotalCount = new Map();
@@ -129,6 +155,30 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
         }
     };
 
+    const recordParsedChord = (parsed) => {
+        if (!parsed) return;
+        if (parsed.rootStr.includes('b')) {
+            originalFlatsCount++;
+        } else if (parsed.rootStr.includes('#')) {
+            originalSharpsCount++;
+        }
+        if (parsed.bassStr?.includes('b')) {
+            originalFlatsCount++;
+        } else if (parsed.bassStr?.includes('#')) {
+            originalSharpsCount++;
+        }
+
+        const transposedRoot = mod12(parsed.rootSemitone + semitones);
+        addPitchClass(transposedRoot, 2, true);
+        chordQualities.push({ rootPc: transposedRoot, isMinor: parsed.isMinor });
+
+        if (parsed.bassSemitone !== null) {
+            const transposedBass = mod12(parsed.bassSemitone + semitones);
+            addPitchClass(transposedBass, 1, false);
+        }
+    };
+
+    // 1. Scan parenthetical (...) chord groups
     const parenRegex = /\(([^)]+)\)/g;
     let match;
     while ((match = parenRegex.exec(lyrics)) !== null) {
@@ -138,28 +188,17 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
 
         const tokens = match[1].split(CHORD_GROUP_DELIMITER_REGEX);
         for (const rawTok of tokens) {
-            const parsed = parseChordToken(rawTok);
-            if (!parsed) {
-                continue;
-            }
-            if (parsed.rootStr.includes('b')) {
-                originalFlatsCount++;
-            } else if (parsed.rootStr.includes('#')) {
-                originalSharpsCount++;
-            }
-            if (parsed.bassStr?.includes('b')) {
-                originalFlatsCount++;
-            } else if (parsed.bassStr?.includes('#')) {
-                originalSharpsCount++;
-            }
+            recordParsedChord(parseChordToken(rawTok));
+        }
+    }
 
-            const transposedRoot = mod12(parsed.rootSemitone + semitones);
-            addPitchClass(transposedRoot, 2, true);
-            chordQualities.push({ rootPc: transposedRoot, isMinor: parsed.isMinor });
-
-            if (parsed.bassSemitone !== null) {
-                const transposedBass = mod12(parsed.bassSemitone + semitones);
-                addPitchClass(transposedBass, 1, false);
+    // 2. If no parenthetical chords were found (e.g. OrigenZK / OrigenLK), scan standalone chord lines
+    if (pitchClassCounts.size === 0) {
+        for (const line of String(lyrics).split('\n')) {
+            if (isStandaloneChordLine(line)) {
+                for (const rawTok of line.trim().split(/\s+/)) {
+                    recordParsedChord(parseChordToken(rawTok));
+                }
             }
         }
     }
@@ -319,7 +358,7 @@ export function transposeSongContents(
         globalSemitones + (applyCapoDropCorrection ? Number(frontmatterCapo || 0) : 0);
     const useFlats = deduceSongUseFlats(contents, songHalfTones, songKeyHint);
 
-    return contents.replace(/\(([^)]*)\)/g, (fullMatch, inner) => {
+    const afterParens = contents.replace(/\(([^)]*)\)/g, (fullMatch, inner) => {
         const lower = fullMatch.toLowerCase();
         if (SKIP_PAREN_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
             return fullMatch;
@@ -349,4 +388,14 @@ export function transposeSongContents(
             deduceSongUseFlats(contents, songHalfTones, songKeyHint) ?? useFlats;
         return `(${transposeChordGroupInner(inner, songHalfTones, currentUseFlats)})`;
     });
+
+    // Also transpose standalone chord lines (OrigenZK / OrigenLK)
+    return afterParens
+        .split('\n')
+        .map((line) =>
+            isStandaloneChordLine(line)
+                ? transposeStandaloneChordLine(line, songHalfTones, useFlats)
+                : line
+        )
+        .join('\n');
 }
