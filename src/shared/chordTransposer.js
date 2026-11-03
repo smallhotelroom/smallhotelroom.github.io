@@ -1,6 +1,8 @@
 /**
  * @file src/shared/chordTransposer.js (in smallhotelroom.github.io)
- * @version 4.5.0
+ * @version 5.0.0
+ * Pure canonical chord parser, harmonic key/enharmonic analyzer, and parenthetical transposer.
+ * Contains zero crawler-specific heuristics.
  */
 import {
     SHARP_NOTES,
@@ -13,7 +15,7 @@ import {
     SYNTAX_PALETTE,
 } from './songSchema.js';
 
-export const __version__ = '4.5.0';
+export const __version__ = '5.0.0';
 
 export {
     SHARP_NOTES,
@@ -79,8 +81,8 @@ export function parseChordToken(token) {
 }
 
 /**
- * Checks if the inside of a `(...)` group in curated or crawler songs actually contains
- * valid chords (and not tab harmonics like `(12)` or lyric remarks like `(coro)`).
+ * Checks if the inside of a `(...)` group in curated songs contains valid chords
+ * (and not directives or non-chord parenthetical remarks).
  */
 export function isValidParenChordGroup(innerStr) {
     if (!innerStr || typeof innerStr !== 'string') {
@@ -104,57 +106,27 @@ export function isValidParenChordGroup(innerStr) {
 }
 
 /**
- * Returns true if `lineText` is a chord line (whether chords are bare, wrapped in parentheses,
- * or accompanied by repeat markers like `x2` / `x4`), while rejecting ASCII guitar tab lines
- * like `e|---(12)---|` and lyric lines.
+ * Extracts all parsed chord objects from canonical parenthetical `(...)` notation.
  */
-export function isCrawlerChordLine(lineText) {
-    if (!lineText || typeof lineText !== 'string') {
-        return false;
-    }
-    const trimmed = lineText.trim();
-    if (!trimmed || trimmed.includes('[') || trimmed.includes(']')) {
-        return false;
-    }
-    // Reject ASCII tablature lines (e.g. "e|---(12)---|" or "----12----")
-    if (trimmed.includes('--') || /[eBGDAE]\|/.test(trimmed)) {
-        return false;
-    }
+export function extractCuratedChordsFromLyrics(lyrics = '') {
+    const parsedChords = [];
+    const parenRegex = /\(([^)]+)\)/g;
+    let match;
 
-    const withoutParens = trimmed.replace(/[()]/g, ' ').trim();
-    if (!withoutParens) {
-        return false;
-    }
-
-    const tokens = withoutParens.split(/\s+/);
-    let validChordCount = 0;
-
-    for (const tok of tokens) {
-        if (parseChordToken(tok) !== null) {
-            validChordCount++;
-        } else if (/^(?:x\d+|\d+x|\|)$/i.test(tok)) {
+    while ((match = parenRegex.exec(lyrics)) !== null) {
+        if (!isValidParenChordGroup(match[1])) {
             continue;
-        } else {
-            return false;
+        }
+        const tokens = match[1].split(CHORD_GROUP_DELIMITER_REGEX);
+        for (const rawTok of tokens) {
+            const parsed = parseChordToken(rawTok);
+            if (parsed) {
+                parsedChords.push(parsed);
+            }
         }
     }
 
-    return validChordCount > 0;
-}
-
-export const isStandaloneChordLine = isCrawlerChordLine;
-
-/**
- * Transposes any chord line (with or without parentheses) by replacing each valid chord token
- * in-place while preserving all whitespace, parentheses, and repeat markers (`x2`).
- */
-export function transposeStandaloneChordLine(lineText, semitones = 0, useFlats = false) {
-    return lineText.replace(/([A-G][#b]?[^\s()]*)/g, (candidate) => {
-        if (parseChordToken(candidate) !== null) {
-            return transposeChordToken(candidate, semitones, useFlats);
-        }
-        return candidate;
-    });
+    return parsedChords;
 }
 
 function evaluatePaletteCollisions(palette, pitchClassCounts, rootPitchClassSet) {
@@ -195,9 +167,16 @@ function evaluatePaletteCollisions(palette, pitchClassCounts, rootPitchClassSet)
 }
 
 /**
- * Internal analyzer shared by `deduceSongUseFlats`, `deduceSongKey`, and `deduceSongKeyInfo`.
+ * Core harmonic analyzer. Accepts an optional `customChordExtractor` function
+ * so external apps (e.g. Acordismo crawler layers) can supply non-parenthetical chords
+ * without embedding crawler logic in this module.
  */
-function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
+export function analyzeSongHarmony(
+    lyrics = '',
+    semitones = 0,
+    songKeyHint = null,
+    customChordExtractor = null
+) {
     const pitchClassCounts = new Map();
     const rootPitchClassSet = new Set();
     const chordQualities = [];
@@ -239,25 +218,13 @@ function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
         }
     };
 
-    for (const line of String(lyrics).split('\n')) {
-        if (isCrawlerChordLine(line)) {
-            const cleaned = line.replace(/[()]/g, ' ').trim();
-            for (const rawTok of cleaned.split(/\s+/)) {
-                recordParsedChord(parseChordToken(rawTok));
-            }
-        } else {
-            const parenRegex = /\(([^)]+)\)/g;
-            let match;
-            while ((match = parenRegex.exec(line)) !== null) {
-                if (!isValidParenChordGroup(match[1])) {
-                    continue;
-                }
-                const tokens = match[1].split(CHORD_GROUP_DELIMITER_REGEX);
-                for (const rawTok of tokens) {
-                    recordParsedChord(parseChordToken(rawTok));
-                }
-            }
-        }
+    const extracted =
+        typeof customChordExtractor === 'function'
+            ? customChordExtractor(lyrics)
+            : extractCuratedChordsFromLyrics(lyrics);
+
+    for (const parsed of extracted) {
+        recordParsedChord(parsed);
     }
 
     let bestMajorTonic = 0;
@@ -328,14 +295,19 @@ function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
     };
 }
 
-export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = null) {
+export function deduceSongUseFlats(
+    lyrics = '',
+    semitones = 0,
+    songKeyHint = null,
+    customChordExtractor = null
+) {
     const {
         pitchClassCounts,
         rootPitchClassSet,
         originalFlatsCount,
         originalSharpsCount,
         bestMajorTonic,
-    } = analyzeSongHarmony(lyrics, semitones, songKeyHint);
+    } = analyzeSongHarmony(lyrics, semitones, songKeyHint, customChordExtractor);
 
     const hasBlackKeys = [...pitchClassCounts.keys()].some((pc) =>
         [1, 3, 6, 8, 10].includes(pc)
@@ -400,8 +372,18 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
  * Deduces the musical key of a song AND returns a confidence percentage (0–99%).
  * Returns `{ key: string, confidence: number } | null`.
  */
-export function deduceSongKeyInfo(lyrics = '', semitones = 0, songKeyHint = null) {
-    const useFlats = deduceSongUseFlats(lyrics, semitones, songKeyHint);
+export function deduceSongKeyInfo(
+    lyrics = '',
+    semitones = 0,
+    songKeyHint = null,
+    customChordExtractor = null
+) {
+    const useFlats = deduceSongUseFlats(
+        lyrics,
+        semitones,
+        songKeyHint,
+        customChordExtractor
+    );
     const palette = useFlats ? FLAT_NOTES : SHARP_NOTES;
 
     if (songKeyHint && typeof songKeyHint === 'string') {
@@ -424,7 +406,7 @@ export function deduceSongKeyInfo(lyrics = '', semitones = 0, songKeyHint = null
         secondBestScore,
         totalPitchWeight,
         bestScaleCoverageWeight,
-    } = analyzeSongHarmony(lyrics, semitones, null);
+    } = analyzeSongHarmony(lyrics, semitones, null, customChordExtractor);
 
     if (chordQualities.length === 0) {
         return null;
@@ -454,18 +436,13 @@ export function deduceSongKeyInfo(lyrics = '', semitones = 0, songKeyHint = null
         ? `${palette[relMinorTonic]}m`
         : palette[bestMajorTonic];
 
-    // Calculate confidence percentage (15% - 99%) from:
-    // 1) Diatonic scale coverage (how many played notes fit inside the 7-note scale)
     const scaleCoverage =
         totalPitchWeight > 0 ? bestScaleCoverageWeight / totalPitchWeight : 0.7;
-    // 2) Margin of victory over the 2nd best key signature
     const scoreMargin =
         bestScore > 0 ? Math.max(0, (bestScore - Math.max(0, secondBestScore)) / bestScore) : 0.25;
-    // 3) Clarity between Relative Major (I) vs Relative Minor (vi)
     const modeTotal = majorWeight + minorWeight;
     const modeClarity =
         modeTotal > 0 ? Math.abs(majorWeight - minorWeight) / modeTotal : 0.35;
-    // 4) Sample size factor (1-chord drones have lower certainty than multi-chord progressions)
     const sampleFactor = Math.min(1, chordQualities.length / 4);
 
     const rawConfidence =
@@ -482,11 +459,13 @@ export function deduceSongKeyInfo(lyrics = '', semitones = 0, songKeyHint = null
     };
 }
 
-/**
- * Backwards-compatible wrapper returning just the deduced key string (e.g. "Em").
- */
-export function deduceSongKey(lyrics = '', semitones = 0, songKeyHint = null) {
-    const info = deduceSongKeyInfo(lyrics, semitones, songKeyHint);
+export function deduceSongKey(
+    lyrics = '',
+    semitones = 0,
+    songKeyHint = null,
+    customChordExtractor = null
+) {
+    const info = deduceSongKeyInfo(lyrics, semitones, songKeyHint, customChordExtractor);
     return info ? info.key : null;
 }
 
@@ -557,48 +536,37 @@ export function transposeSongContents(
         globalSemitones + (applyCapoDropCorrection ? Number(frontmatterCapo || 0) : 0);
     const useFlats = deduceSongUseFlats(contents, songHalfTones, songKeyHint);
 
-    return String(contents || '')
-        .split('\n')
-        .map((line) => {
-            if (isCrawlerChordLine(line) && !line.includes('(')) {
-                return transposeStandaloneChordLine(line, songHalfTones, useFlats);
+    return String(contents || '').replace(/\(([^)]*)\)/g, (fullMatch, inner) => {
+        const lower = fullMatch.toLowerCase();
+        if (SKIP_PAREN_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
+            return fullMatch;
+        }
+        if (lower.includes('capo')) {
+            if (applyCapoDropCorrection) {
+                const nums = fullMatch.match(/\d+/g);
+                if (nums && nums.length === 1) {
+                    songHalfTones += parseInt(nums[0], 10);
+                    return `(chords for no capo; generated from ${inner})`;
+                }
             }
-            if (isCrawlerChordLine(line) && line.includes('(')) {
-                return transposeStandaloneChordLine(line, songHalfTones, useFlats);
+            return fullMatch;
+        }
+        if (lower.includes('drop')) {
+            if (applyCapoDropCorrection) {
+                const nums = fullMatch.match(/\d+/g);
+                if (nums && nums.length === 1) {
+                    songHalfTones -= parseInt(nums[0], 10);
+                    return `(chords for no drop; generated from ${inner})`;
+                }
             }
-            return line.replace(/\(([^)]*)\)/g, (fullMatch, inner) => {
-                const lower = fullMatch.toLowerCase();
-                if (SKIP_PAREN_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
-                    return fullMatch;
-                }
-                if (lower.includes('capo')) {
-                    if (applyCapoDropCorrection) {
-                        const nums = fullMatch.match(/\d+/g);
-                        if (nums && nums.length === 1) {
-                            songHalfTones += parseInt(nums[0], 10);
-                            return `(chords for no capo; generated from ${inner})`;
-                        }
-                    }
-                    return fullMatch;
-                }
-                if (lower.includes('drop')) {
-                    if (applyCapoDropCorrection) {
-                        const nums = fullMatch.match(/\d+/g);
-                        if (nums && nums.length === 1) {
-                            songHalfTones -= parseInt(nums[0], 10);
-                            return `(chords for no drop; generated from ${inner})`;
-                        }
-                    }
-                    return fullMatch;
-                }
-                if (!isValidParenChordGroup(inner)) {
-                    return fullMatch;
-                }
+            return fullMatch;
+        }
+        if (!isValidParenChordGroup(inner)) {
+            return fullMatch;
+        }
 
-                const currentUseFlats =
-                    deduceSongUseFlats(contents, songHalfTones, songKeyHint) ?? useFlats;
-                return `(${transposeChordGroupInner(inner, songHalfTones, currentUseFlats)})`;
-            });
-        })
-        .join('\n');
+        const currentUseFlats =
+            deduceSongUseFlats(contents, songHalfTones, songKeyHint) ?? useFlats;
+        return `(${transposeChordGroupInner(inner, songHalfTones, currentUseFlats)})`;
+    });
 }
