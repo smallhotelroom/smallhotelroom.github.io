@@ -1,24 +1,26 @@
 /**
  * @file src/shared/chordTransposer.js (in smallhotelroom.github.io)
- * @version 4.1.0
+ * @version 4.2.0
  */
 import {
     SHARP_NOTES,
     FLAT_NOTES,
     NOTE_TO_SEMITONE,
     SKIP_PAREN_PREFIXES,
+    DIRECTIVE_PAREN_REGEX,
     CHORD_GROUP_DELIMITER_REGEX,
     CHORD_QUALITY_REGEX,
     SYNTAX_PALETTE,
 } from './songSchema.js';
 
-export const __version__ = '4.1.0';
+export const __version__ = '4.2.0';
 
 export {
     SHARP_NOTES,
     FLAT_NOTES,
     NOTE_TO_SEMITONE,
     SKIP_PAREN_PREFIXES,
+    DIRECTIVE_PAREN_REGEX,
     CHORD_GROUP_DELIMITER_REGEX,
     CHORD_QUALITY_REGEX,
     SYNTAX_PALETTE,
@@ -130,11 +132,7 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
     const parenRegex = /\(([^)]+)\)/g;
     let match;
     while ((match = parenRegex.exec(lyrics)) !== null) {
-        const fullParen = match[0].toLowerCase();
-        if (SKIP_PAREN_PREFIXES.some((prefix) => fullParen.startsWith(prefix))) {
-            continue;
-        }
-        if (fullParen.includes('capo') || fullParen.includes('drop')) {
+        if (DIRECTIVE_PAREN_REGEX.test(match[1])) {
             continue;
         }
 
@@ -286,11 +284,7 @@ export function transposeChordToken(token, semitones = 0, useFlats = null) {
 }
 
 export function transposeChordGroupInner(chordGroupInner, semitones = 0, useFlats = false) {
-    const lower = chordGroupInner.toLowerCase();
-    if (
-        SKIP_PAREN_PREFIXES.some((p) => `(${lower}`.startsWith(p)) ||
-        lower.includes('bpm')
-    ) {
+    if (DIRECTIVE_PAREN_REGEX.test(chordGroupInner)) {
         return chordGroupInner;
     }
 

@@ -1,11 +1,11 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.2.0
+ * @version 2.3.0
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
  * and Syntax Highlighting Color Palettes (shared by VS Code Linter, Acordismo App, and Web).
  */
 
-export const __version__ = '2.2.0';
+export const __version__ = '2.3.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -38,6 +38,8 @@ export const TREATED_KEYS = [
   "falsetto",
   "featuring",
   "highest",
+  "init",
+  "initNote",
   "isrc",
   "key",
   "lang",
@@ -91,11 +93,16 @@ export const SKIP_PAREN_PREFIXES = [
   '(chords for',
 ];
 
-// Delimiters & playing annotations allowed inside (...) chord blocks
-export const CHORD_GROUP_DELIMITER_REGEX =
-  /  |_|!|\.\.\.|\.\.|: |\*|high|open|bass|riff|palm mute|notes|sus4/;
+// Unified regex for parenthetical directives (used across SongScreen, chordTransposer, and Linter)
+export const DIRECTIVE_PAREN_REGEX =
+  /bpm|tempo|key|highest|falsetto|all|chords for|capo|drop/i;
 
-// Allowed chord quality/modifier suffixes after the root note (e.g. m, maj7, dim, add9, 7b5)
+// Delimiters & playing annotations allowed inside (...) chord blocks
+// Note: 'sus4' is intentionally NOT a delimiter because CHORD_QUALITY_REGEX handles sus4 natively (including E9sus4/A)
+export const CHORD_GROUP_DELIMITER_REGEX =
+  /  |_|!|\.\.\.|\.\.|: |\*|high|open|bass|riff|palm mute|notes/;
+
+// Allowed chord quality/modifier suffixes after the root note (e.g. m, maj7, dim, add9, 9sus4, 7b5)
 export const CHORD_QUALITY_REGEX =
   /^(?:m|maj|min|dim|aug|sus|add|[0-9]|[#b+-]|M|\(|\))*$/i;
 
