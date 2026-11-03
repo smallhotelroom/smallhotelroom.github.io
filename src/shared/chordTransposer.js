@@ -1,6 +1,6 @@
 /**
  * @file src/shared/chordTransposer.js (in smallhotelroom.github.io)
- * @version 4.4.0
+ * @version 4.5.0
  */
 import {
     SHARP_NOTES,
@@ -13,7 +13,7 @@ import {
     SYNTAX_PALETTE,
 } from './songSchema.js';
 
-export const __version__ = '4.4.0';
+export const __version__ = '4.5.0';
 
 export {
     SHARP_NOTES,
@@ -121,7 +121,6 @@ export function isCrawlerChordLine(lineText) {
         return false;
     }
 
-    // Strip parentheses so both "Am  F  C  G" and "(Am  F)  C  (G)" can be evaluated token-by-token
     const withoutParens = trimmed.replace(/[()]/g, ' ').trim();
     if (!withoutParens) {
         return false;
@@ -134,7 +133,6 @@ export function isCrawlerChordLine(lineText) {
         if (parseChordToken(tok) !== null) {
             validChordCount++;
         } else if (/^(?:x\d+|\d+x|\|)$/i.test(tok)) {
-            // Allow repeat markers like x2, x4, 2x, or barline | on a chord line
             continue;
         } else {
             return false;
@@ -197,7 +195,7 @@ function evaluatePaletteCollisions(palette, pitchClassCounts, rootPitchClassSet)
 }
 
 /**
- * Internal analyzer shared by `deduceSongUseFlats` and `deduceSongKey`.
+ * Internal analyzer shared by `deduceSongUseFlats`, `deduceSongKey`, and `deduceSongKeyInfo`.
  */
 function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
     const pitchClassCounts = new Map();
@@ -241,7 +239,6 @@ function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
         }
     };
 
-    // Scan lines for both crawler chord lines and valid (...) chord groups
     for (const line of String(lyrics).split('\n')) {
         if (isCrawlerChordLine(line)) {
             const cleaned = line.replace(/[()]/g, ' ').trim();
@@ -265,14 +262,22 @@ function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
 
     let bestMajorTonic = 0;
     let bestScore = -Infinity;
+    let secondBestScore = -Infinity;
+    let totalPitchWeight = 0;
+    for (const count of pitchClassCounts.values()) {
+        totalPitchWeight += count;
+    }
+    let bestScaleCoverageWeight = 0;
 
     for (let tonic = 0; tonic < 12; tonic++) {
         const scaleSet = new Set(MAJOR_SCALE_INTERVALS.map((i) => mod12(tonic + i)));
         let score = 0;
+        let inScaleWeight = 0;
 
         for (const [pc, count] of pitchClassCounts.entries()) {
             if (scaleSet.has(pc)) {
                 score += count * 3;
+                inScaleWeight += count;
             }
         }
 
@@ -296,8 +301,12 @@ function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
         }
 
         if (score > bestScore) {
+            secondBestScore = bestScore;
             bestScore = score;
             bestMajorTonic = tonic;
+            bestScaleCoverageWeight = inScaleWeight;
+        } else if (score > secondBestScore) {
+            secondBestScore = score;
         }
     }
 
@@ -310,6 +319,10 @@ function analyzeSongHarmony(lyrics = '', semitones = 0, songKeyHint = null) {
         firstChord,
         lastChord,
         bestMajorTonic,
+        bestScore,
+        secondBestScore,
+        totalPitchWeight,
+        bestScaleCoverageWeight,
         songKeyHint,
         semitones,
     };
@@ -384,11 +397,10 @@ export function deduceSongUseFlats(lyrics = '', semitones = 0, songKeyHint = nul
 }
 
 /**
- * Deduces the musical key of a song (e.g. "Em", "G", "F#m") from its chords.
- * Decides between the best Major tonic (I) and its relative Minor tonic (vi)
- * based on occurrence counts and opening/closing chord resolution.
+ * Deduces the musical key of a song AND returns a confidence percentage (0–99%).
+ * Returns `{ key: string, confidence: number } | null`.
  */
-export function deduceSongKey(lyrics = '', semitones = 0, songKeyHint = null) {
+export function deduceSongKeyInfo(lyrics = '', semitones = 0, songKeyHint = null) {
     const useFlats = deduceSongUseFlats(lyrics, semitones, songKeyHint);
     const palette = useFlats ? FLAT_NOTES : SHARP_NOTES;
 
@@ -396,15 +408,23 @@ export function deduceSongKey(lyrics = '', semitones = 0, songKeyHint = null) {
         const parsedHint = parseChordToken(songKeyHint.trim());
         if (parsedHint) {
             const newRoot = palette[mod12(parsedHint.rootSemitone + semitones)];
-            return `${newRoot}${parsedHint.isMinor ? 'm' : ''}`;
+            return {
+                key: `${newRoot}${parsedHint.isMinor ? 'm' : ''}`,
+                confidence: 100,
+            };
         }
     }
 
-    const { chordQualities, firstChord, lastChord, bestMajorTonic } = analyzeSongHarmony(
-        lyrics,
-        semitones,
-        null
-    );
+    const {
+        chordQualities,
+        firstChord,
+        lastChord,
+        bestMajorTonic,
+        bestScore,
+        secondBestScore,
+        totalPitchWeight,
+        bestScaleCoverageWeight,
+    } = analyzeSongHarmony(lyrics, semitones, null);
 
     if (chordQualities.length === 0) {
         return null;
@@ -417,7 +437,6 @@ export function deduceSongKey(lyrics = '', semitones = 0, songKeyHint = null) {
     for (const cq of chordQualities) {
         if (cq.rootPc === bestMajorTonic && !cq.isMinor) majorWeight += 3;
         if (cq.rootPc === relMinorTonic && cq.isMinor) minorWeight += 3;
-        // V7 or V of relative minor (e.g. E or E7 in Am) strongly signals minor key
         if (cq.rootPc === mod12(relMinorTonic + 7) && !cq.isMinor) minorWeight += 2;
     }
 
@@ -430,10 +449,45 @@ export function deduceSongKey(lyrics = '', semitones = 0, songKeyHint = null) {
         if (lastChord.rootPc === relMinorTonic && lastChord.isMinor) minorWeight += 5;
     }
 
-    if (minorWeight > majorWeight) {
-        return `${palette[relMinorTonic]}m`;
-    }
-    return palette[bestMajorTonic];
+    const isMinorWinner = minorWeight > majorWeight;
+    const keyStr = isMinorWinner
+        ? `${palette[relMinorTonic]}m`
+        : palette[bestMajorTonic];
+
+    // Calculate confidence percentage (15% - 99%) from:
+    // 1) Diatonic scale coverage (how many played notes fit inside the 7-note scale)
+    const scaleCoverage =
+        totalPitchWeight > 0 ? bestScaleCoverageWeight / totalPitchWeight : 0.7;
+    // 2) Margin of victory over the 2nd best key signature
+    const scoreMargin =
+        bestScore > 0 ? Math.max(0, (bestScore - Math.max(0, secondBestScore)) / bestScore) : 0.25;
+    // 3) Clarity between Relative Major (I) vs Relative Minor (vi)
+    const modeTotal = majorWeight + minorWeight;
+    const modeClarity =
+        modeTotal > 0 ? Math.abs(majorWeight - minorWeight) / modeTotal : 0.35;
+    // 4) Sample size factor (1-chord drones have lower certainty than multi-chord progressions)
+    const sampleFactor = Math.min(1, chordQualities.length / 4);
+
+    const rawConfidence =
+        (scaleCoverage * 0.48 +
+            Math.min(1, scoreMargin * 2.2) * 0.27 +
+            modeClarity * 0.25) *
+        (0.65 + 0.35 * sampleFactor);
+
+    const confidence = Math.max(15, Math.min(99, Math.round(rawConfidence * 100)));
+
+    return {
+        key: keyStr,
+        confidence,
+    };
+}
+
+/**
+ * Backwards-compatible wrapper returning just the deduced key string (e.g. "Em").
+ */
+export function deduceSongKey(lyrics = '', semitones = 0, songKeyHint = null) {
+    const info = deduceSongKeyInfo(lyrics, semitones, songKeyHint);
+    return info ? info.key : null;
 }
 
 export function transposeChordToken(token, semitones = 0, useFlats = null) {
