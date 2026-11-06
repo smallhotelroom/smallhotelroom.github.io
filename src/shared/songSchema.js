@@ -1,11 +1,11 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.3.0
+ * @version 2.4.0
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
- * and Syntax Highlighting Color Palettes (shared by VS Code Linter, Acordismo App, and Web).
+ * and Syntax Highlighting Color Palettes (shared by VS Code Linter, Acordismo App, Web, and PDFs).
  */
 
-export const __version__ = '2.3.0';
+export const __version__ = '2.4.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -93,12 +93,11 @@ export const SKIP_PAREN_PREFIXES = [
   '(chords for',
 ];
 
-// Unified regex for parenthetical directives (used across SongScreen, chordTransposer, and Linter)
+// Unified regex for parenthetical directives (used across SongScreen, chordTransposer, Linter, and PDF)
 export const DIRECTIVE_PAREN_REGEX =
   /bpm|tempo|key|highest|falsetto|all|chords for|capo|drop/i;
 
 // Delimiters & playing annotations allowed inside (...) chord blocks
-// Note: 'sus4' is intentionally NOT a delimiter because CHORD_QUALITY_REGEX handles sus4 natively (including E9sus4/A)
 export const CHORD_GROUP_DELIMITER_REGEX =
   /  |_|!|\.\.\.|\.\.|: |\*|high|open|bass|riff|palm mute|notes/;
 
@@ -106,7 +105,7 @@ export const CHORD_GROUP_DELIMITER_REGEX =
 export const CHORD_QUALITY_REGEX =
   /^(?:m|maj|min|dim|aug|sus|add|[0-9]|[#b+-]|M|\(|\))*$/i;
 
-// --- SHARED SYNTAX HIGHLIGHTING PALETTE (Linter + SongScreen) ---
+// --- SHARED SYNTAX HIGHLIGHTING PALETTE (Linter + SongScreen + PDF) ---
 export const SYNTAX_PALETTE = {
   dark: {
     parenBg: 'rgba(121, 192, 255, 0.06)',
@@ -123,6 +122,14 @@ export const SYNTAX_PALETTE = {
     modifier: '#6e40c9',    // Crisp purple for modifiers
     directive: '#b45309',   // Crisp warm amber/gold for directives
     choir: '#1a7f37',       // Deep forest green for '[choir]'
+  },
+  pdfBw: {
+    parenBg: 'transparent',
+    parenSymbol: '#6e6e6e', // Charcoal grey for '(' and ')' so black chords pop on B/W paper
+    chord: '#000000',       // Pure pitch black for chords
+    modifier: '#6e6e6e',    // Charcoal grey for '!', '_', 'riff', 'palm mute', etc.
+    directive: '#4b5563',   // Slate grey for '(capo ...)', '(drop ...)', '(bpm ...)'
+    choir: '#525252',       // Medium-dark grey for italic '[choir]'
   },
 };
 
