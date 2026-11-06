@@ -1,11 +1,11 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.4.0
+ * @version 2.5.0
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
  * and Syntax Highlighting Color Palettes (shared by VS Code Linter, Acordismo App, Web, and PDFs).
  */
 
-export const __version__ = '2.4.0';
+export const __version__ = '2.5.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -38,7 +38,6 @@ export const TREATED_KEYS = [
   "falsetto",
   "featuring",
   "highest",
-  "init",
   "initNote",
   "isrc",
   "key",
