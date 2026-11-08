@@ -1,11 +1,11 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.7.0
+ * @version 2.7.1
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
  * Markdown `##` Section & Harmonic Fingering Postures Schema, and Syntax Highlighting Color Palettes.
  */
 
-export const __version__ = '2.7.0';
+export const __version__ = '2.7.1';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -125,9 +125,6 @@ export const NOTES_SECTION_HEADER_REGEX =
 export const getChordExpectedPitchClasses = (rootSemitone, rawQuality = '', bassSemitone = null) => {
   const q = String(rawQuality || '').trim().replace(/^\(|\)$/g, '');
 
-  // Map chord quality to intervals (in semitones above root)
-  // `required` = characteristic intervals that distinguish the chord quality (root, 3rd/sus, 7th/6th/add9)
-  // (The perfect 5th [7] is allowed on all standard chords and often omitted in 4-string ukulele or jazz voicings)
   let allowedIntervals = [0, 4, 7];
   let requiredIntervals = [0, 4];
 
@@ -207,7 +204,6 @@ export const getChordExpectedPitchClasses = (rootSemitone, rawQuality = '', bass
     allowedIntervals = [0, 2, 4, 7, 11];
     requiredIntervals = [0, 2, 4, 11];
   } else {
-    // Unrecognized complex jazz extension: skip strict interval rejection
     return null;
   }
 
@@ -308,19 +304,11 @@ export const validateVoicingHarmony = (
 /**
  * Parses and harmonically validates a single plain-text chord fingering definition line
  * inside `## Chords` / `## Fingerings`.
- * Supported plain-text formats:
- *   Cmaj7: x32000
- *   Em7: 022030
- *   Bm7b5: x2323x "Half-diminished"
- *   D5/A: x 0 0 2 3 5
- *   G7 (uke): 0212
- *
- * Returns `{ valid: true, chordName, instrument, frets, label }` or `{ valid: false, error }`.
  */
 export const parseFingeringDefinitionLine = (rawLine = '') => {
   const trimmed = String(rawLine || '').replace(/\s+#.*$/, '').trim();
   if (!trimmed || trimmed.startsWith('#')) {
-    return null; // Blank or comment line
+    return null;
   }
 
   const colonIdx = trimmed.indexOf(':');
@@ -334,7 +322,6 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
   const leftSide = trimmed.slice(0, colonIdx).trim();
   let rightSide = trimmed.slice(colonIdx + 1).trim();
 
-  // Extract optional instrument tag on left side: e.g. "G7 (uke)" or "Cmaj7 (guitar)"
   let explicitInstrument = null;
   let chordName = leftSide;
   const instMatch = /^(\S+)\s+\((guitar|gtr|uke|ukulele)\)$/i.exec(leftSide);
@@ -344,7 +331,6 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
     explicitInstrument = tag.startsWith('uk') ? 'ukulele' : 'guitar';
   }
 
-  // Validate chord token syntax (Root + Quality + optional /Bass)
   const chordMatch = /^([A-G][#b]?)([^/]*?)(?:\/([A-G][#b]?))?$/.exec(chordName);
   if (
     !chordMatch ||
@@ -362,7 +348,6 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
   const quality = chordMatch[2] || '';
   const bassSemitone = chordMatch[3] ? NOTE_TO_SEMITONE[chordMatch[3]] : null;
 
-  // Extract optional quoted label on right side: e.g. x32000 "Thumb on 6th"
   let label = null;
   const quoteMatch = /^(.*?)\s+["'](.+)["']\s*$/.exec(rightSide);
   if (quoteMatch) {
@@ -418,7 +403,6 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
     };
   }
 
-  // Harmonic pitch-class validation (catches wrong notes like Em7: 02204x playing D# instead of D)
   const harmonyCheck = validateVoicingHarmony(
     chordName,
     rootSemitone,
@@ -596,8 +580,11 @@ export const parseFrontmatterFile = (rawText) => {
 
   const yamlBlock = normalized.slice(4, endIdx);
   const lines = yamlBlock.split('\n');
-  const bodyStartLine = lines.length + 3;
-  const content = normalized.slice(endIdx + 5).replace(/^\n/, '');
+  const rawAfterClose = normalized.slice(endIdx + 5);
+  const strippedLeadingNewline = rawAfterClose.startsWith('\n');
+  // Opening '---' (1) + yamlBlock lines (lines.length) + closing '---' (1) + optional leading '\n'
+  const bodyStartLine = lines.length + 2 + (strippedLeadingNewline ? 1 : 0);
+  const content = strippedLeadingNewline ? rawAfterClose.slice(1) : rawAfterClose;
   const data = {};
   const keyLines = {};
 
