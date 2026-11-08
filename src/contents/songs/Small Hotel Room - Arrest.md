@@ -77,3 +77,5 @@ Your father and I found out on time
 
 ## Chords
 Em7: 02203x
+G: 32003x
+D/F#: 20023x
