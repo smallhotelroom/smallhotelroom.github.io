@@ -1,11 +1,11 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.7.1
+ * @version 2.7.2
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
  * Markdown `##` Section & Harmonic Fingering Postures Schema, and Syntax Highlighting Color Palettes.
  */
 
-export const __version__ = '2.7.1';
+export const __version__ = '2.7.2';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -582,8 +582,8 @@ export const parseFrontmatterFile = (rawText) => {
   const lines = yamlBlock.split('\n');
   const rawAfterClose = normalized.slice(endIdx + 5);
   const strippedLeadingNewline = rawAfterClose.startsWith('\n');
-  // Opening '---' (1) + yamlBlock lines (lines.length) + closing '---' (1) + optional leading '\n'
-  const bodyStartLine = lines.length + 2 + (strippedLeadingNewline ? 1 : 0);
+  // Line 1 is opening '---' (1) + yamlBlock lines (lines.length) + closing '---' (1) + first body line (1) + optional stripped '\n'
+  const bodyStartLine = lines.length + 3 + (strippedLeadingNewline ? 1 : 0);
   const content = strippedLeadingNewline ? rawAfterClose.slice(1) : rawAfterClose;
   const data = {};
   const keyLines = {};
