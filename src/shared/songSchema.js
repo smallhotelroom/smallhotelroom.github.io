@@ -1,12 +1,12 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.8.0
+ * @version 2.9.0
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
  * Markdown `##` Section & Harmonic Fingering Postures Schema, Reverse Chord Voicing
  * Identification (`suggestChordsForVoicing`), and Syntax Highlighting Color Palettes.
  */
 
-export const __version__ = '2.8.0';
+export const __version__ = '2.9.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -128,7 +128,7 @@ export const CHORD_FORMULAS = [
   { suffix: 'm', aliases: ['min', '-'], allowed: [0, 3, 7], required: [0, 3], priority: 10 },
   { suffix: '5', aliases: [], allowed: [0, 7], required: [0, 7], priority: 9 },
   { suffix: '7', aliases: ['dom7'], allowed: [0, 4, 7, 10], required: [0, 4, 10], priority: 9 },
-  { suffix: 'maj7', aliases: ['M7'], allowed: [0, 4, 7, 11], required: [0, 4, 11], priority: 9 },
+  { suffix: 'maj7', aliases: ['M7', 'Maj7'], allowed: [0, 4, 7, 11], required: [0, 4, 11], priority: 9 },
   { suffix: 'm7', aliases: ['min7', '-7'], allowed: [0, 3, 7, 10], required: [0, 3, 10], priority: 9 },
   { suffix: 'sus2', aliases: ['2'], allowed: [0, 2, 7], required: [0, 2], priority: 8 },
   { suffix: 'sus4', aliases: ['sus'], allowed: [0, 5, 7], required: [0, 5], priority: 8 },
@@ -146,21 +146,42 @@ export const CHORD_FORMULAS = [
   { suffix: '7b9', aliases: ['7-9'], allowed: [0, 1, 4, 7, 10], required: [0, 1, 4, 10], priority: 6 },
   { suffix: '9', aliases: [], allowed: [0, 2, 4, 7, 10], required: [0, 2, 4, 10], priority: 7 },
   { suffix: 'm9', aliases: ['min9'], allowed: [0, 2, 3, 7, 10], required: [0, 2, 3, 10], priority: 7 },
-  { suffix: 'maj9', aliases: ['M9'], allowed: [0, 2, 4, 7, 11], required: [0, 2, 4, 11], priority: 7 },
+  { suffix: 'maj9', aliases: ['M9', 'Maj9'], allowed: [0, 2, 4, 7, 11], required: [0, 2, 4, 11], priority: 7 },
   { suffix: '9sus4', aliases: [], allowed: [0, 2, 5, 7, 10], required: [0, 2, 5, 10], priority: 6 },
   { suffix: 'm(maj7)', aliases: ['mmaj7', 'mM7', 'minmaj7'], allowed: [0, 3, 7, 11], required: [0, 3, 11], priority: 6 },
 ];
 
 /**
- * Finds the matching formula entry for a raw quality string (e.g. '', 'm', 'M7', 'add9').
+ * Finds the matching formula entry for a raw quality string (e.g. '', 'm', 'M7', 'm7', 'add9').
+ * Strictly preserves case for single-letter 'm' (minor) vs 'M' (major) tokens like 'm7'/'M7' and 'm9'/'M9'.
  */
 export const findChordFormula = (rawQuality = '') => {
   const q = String(rawQuality || '').trim().replace(/^\(|\)$/g, '');
+
+  // Pass 1: Exact case-sensitive match on suffix or aliases (critical for 'm7' vs 'M7' and 'm' vs 'M')
   for (const f of CHORD_FORMULAS) {
-    if (f.suffix === q) return f;
-    if (f.aliases.some((a) => a.toLowerCase() === q.toLowerCase())) return f;
-    if (f.suffix.toLowerCase() === q.toLowerCase() && q !== 'M' && q !== 'm') return f;
+    if (f.suffix === q || f.aliases.includes(q)) {
+      return f;
+    }
   }
+
+  // Pass 2: Case-insensitive match ONLY for multi-letter word tokens (maj, min, dim, aug, sus, add, dom)
+  if (!/^[mM][0-9]?$/.test(q)) {
+    const qLower = q.toLowerCase();
+    for (const f of CHORD_FORMULAS) {
+      if (!/^[mM][0-9]?$/.test(f.suffix) && f.suffix.toLowerCase() === qLower) {
+        return f;
+      }
+      if (
+        f.aliases.some(
+          (a) => !/^[mM][0-9]?$/.test(a) && a.toLowerCase() === qLower
+        )
+      ) {
+        return f;
+      }
+    }
+  }
+
   return null;
 };
 
@@ -242,8 +263,8 @@ export const suggestChordsForVoicing = (
       const wrongCount = soundedArr.length - matchingCount;
       const presentReqCount = requiredArr.filter((pc) => soundedPcs.has(pc)).length;
       const missingReqCount = requiredArr.length - presentReqCount;
+      const unplayedAllowedCount = Math.max(0, allowedSet.size - matchingCount);
 
-      // Skip completely unrelated chords
       if (matchingCount === 0 || wrongCount > 1) continue;
       if (targetRootSemitone === null && !soundedPcs.has(rootPc)) continue;
 
@@ -252,40 +273,42 @@ export const suggestChordsForVoicing = (
       let confidence = 0;
 
       if (wrongCount === 0 && missingReqCount === 0) {
-        // Every played note belongs to the chord AND all required tones are present!
-        const coverageRatio = soundedArr.length / formula.allowed.length;
         if (instrument === 'guitar' && !bassMatchesRoot && lowestSoundedPc !== null) {
-          // It's an inversion / slash chord (e.g. D/F# or Cadd9/E)
-          if (targetRootSemitone === rootPc) {
-            chordLabel = `${rootName}${formula.suffix}/${SHARP_NOTES[lowestSoundedPc]}`;
-            confidence = Math.round(92 + Math.min(6, coverageRatio * 6));
-          } else {
-            // In global search ("X: ..."), offer both the root-position interpretation and slash chord
-            chordLabel = `${rootName}${formula.suffix}/${SHARP_NOTES[lowestSoundedPc]}`;
-            confidence = Math.round(78 + Math.min(10, coverageRatio * 8) + formula.priority * 0.4);
-          }
+          chordLabel = `${rootName}${formula.suffix}/${SHARP_NOTES[lowestSoundedPc]}`;
+          confidence = Math.max(
+            75,
+            Math.round(91 - unplayedAllowedCount * 4 + formula.priority * 0.2)
+          );
         } else {
-          // Exact root-position match!
+          // Exact root-position match: 100% when all formula tones are played (e.g. Em7 = 02203x, G5 = 3x003x),
+          // slightly lower (94%) if an optional 5th is omitted.
           confidence = Math.min(
             100,
-            Math.round(94 + Math.min(6, coverageRatio * 6))
+            Math.round(100 - unplayedAllowedCount * 5)
           );
         }
       } else {
-        // Partial / near match (e.g. missing 1 chord tone or 1 wrong finger)
         const noteAccuracy = matchingCount / soundedArr.length;
         const reqCoverage = presentReqCount / requiredArr.length;
         const bassBonus = bassMatchesRoot ? 10 : 0;
         confidence = Math.round(
-          noteAccuracy * 45 + reqCoverage * 38 + bassBonus + formula.priority * 0.5
+          noteAccuracy * 44 +
+            reqCoverage * 36 +
+            bassBonus +
+            formula.priority * 0.5 -
+            unplayedAllowedCount * 3
         );
-        confidence = Math.max(20, Math.min(89, confidence));
+        confidence = Math.max(20, Math.min(88, confidence));
       }
 
       scoredCandidates.push({
         chord: chordLabel,
         confidence,
-        exact: wrongCount === 0 && missingReqCount === 0 && bassMatchesRoot,
+        exact:
+          wrongCount === 0 &&
+          missingReqCount === 0 &&
+          (instrument === 'ukulele' || bassMatchesRoot),
+        unplayedAllowedCount,
         priority: formula.priority,
       });
     }
@@ -294,10 +317,12 @@ export const suggestChordsForVoicing = (
   scoredCandidates.sort((a, b) => {
     if (b.exact !== a.exact) return (b.exact ? 1 : 0) - (a.exact ? 1 : 0);
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    if (a.unplayedAllowedCount !== b.unplayedAllowedCount) {
+      return a.unplayedAllowedCount - b.unplayedAllowedCount;
+    }
     return b.priority - a.priority;
   });
 
-  // Deduplicate by chord label and return top N
   const unique = [];
   const seen = new Set();
   for (const item of scoredCandidates) {
@@ -325,8 +350,6 @@ export const formatChordSuggestionsText = (suggestions = []) => {
 
 /**
  * Validates that the notes sounded by `frets` on `instrument` harmonically match `chordName`.
- * When a mismatch occurs, automatically computes "Did you mean: ...?" suggestions for that root
- * (or across all roots if no close variation on the same root exists).
  */
 export const validateVoicingHarmony = (
   chordName,
@@ -402,14 +425,12 @@ export const validateVoicingHarmony = (
   }
 
   if (issues.length > 0) {
-    // 1. Check variations of the user's intended root first (e.g. G -> G5, Gsus4, G7)
     let suggestions = suggestChordsForVoicing(frets, instrument, {
       targetRootSemitone: rootSemitone,
       targetRootStr: rootStr || SHARP_NOTES[rootSemitone],
       maxResults: 3,
     }).filter((s) => s.chord !== chordName && s.confidence >= 70);
 
-    // 2. Also include top global matches if no high-confidence same-root match was found
     if (suggestions.length === 0 || suggestions[0].confidence < 90) {
       const globalSuggs = suggestChordsForVoicing(frets, instrument, {
         maxResults: 3,
@@ -506,7 +527,6 @@ const parseFretPatternRightSide = (rawRightSide = '', explicitInstrument = null,
 /**
  * Parses and harmonically validates a single plain-text chord fingering definition line
  * inside `## Chords` / `## Fingerings`.
- * Supports recommendations for both invalid chord names (`X: 3x003x`) and harmonic mismatches (`G: 3x003x`).
  */
 export const parseFingeringDefinitionLine = (rawLine = '') => {
   const trimmed = String(rawLine || '').replace(/\s+#.*$/, '').trim();
@@ -534,7 +554,6 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
     explicitInstrument = tag.startsWith('uk') ? 'ukulele' : 'guitar';
   }
 
-  // Parse fret pattern first so we can suggest chords even when `chordName` is invalid (e.g. `X: 3x003x`)
   const fretParse = parseFretPatternRightSide(rightSide, explicitInstrument, chordName);
 
   const chordMatch = /^([A-G][#b]?)([^/]*?)(?:\/([A-G][#b]?))?$/.exec(chordName);
@@ -548,7 +567,6 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
     let suggestionSuffix = '';
     let suggestions = [];
     if (fretParse.valid) {
-      // If the user typed a valid root note with a typo in the quality (e.g. `Gmaj77: ...`), prioritize that root
       const rootPrefixMatch = /^([A-G][#b]?)/.exec(chordName);
       const rootHintSemitone =
         rootPrefixMatch && NOTE_TO_SEMITONE[rootPrefixMatch[1]] !== undefined
