@@ -73,7 +73,7 @@ No black ops, just your organized crime
 Arrest you, arrest you, arrest you
 Your father and I found out on time
 
-(Csus2  Csus2_Csus2!  ..)  (Em7_D/G  G5)
+(Csus2  Csus2_Csus2!  ..)  (Em7_Gsus2  G5)
 
 ## Chords
 Em7: 02203x
@@ -82,3 +82,4 @@ D/F#: 20023x
 Csus2: x3003x
 D: x5777x
 C: x3555x
+Gsus2: 3x023x
