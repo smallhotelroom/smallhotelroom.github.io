@@ -1,11 +1,12 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.7.2
+ * @version 2.8.0
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
- * Markdown `##` Section & Harmonic Fingering Postures Schema, and Syntax Highlighting Color Palettes.
+ * Markdown `##` Section & Harmonic Fingering Postures Schema, Reverse Chord Voicing
+ * Identification (`suggestChordsForVoicing`), and Syntax Highlighting Color Palettes.
  */
 
-export const __version__ = '2.7.2';
+export const __version__ = '2.8.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -119,96 +120,61 @@ export const NOTES_SECTION_HEADER_REGEX =
   /^(?:notes?|notas?|comments?|tabs?|tablature)$/i;
 
 /**
+ * Canonical chord interval definitions (in semitones above root) for harmonic validation
+ * and reverse chord-name identification (`suggestChordsForVoicing`).
+ */
+export const CHORD_FORMULAS = [
+  { suffix: '', aliases: ['M', 'maj'], allowed: [0, 4, 7], required: [0, 4], priority: 10 },
+  { suffix: 'm', aliases: ['min', '-'], allowed: [0, 3, 7], required: [0, 3], priority: 10 },
+  { suffix: '5', aliases: [], allowed: [0, 7], required: [0, 7], priority: 9 },
+  { suffix: '7', aliases: ['dom7'], allowed: [0, 4, 7, 10], required: [0, 4, 10], priority: 9 },
+  { suffix: 'maj7', aliases: ['M7'], allowed: [0, 4, 7, 11], required: [0, 4, 11], priority: 9 },
+  { suffix: 'm7', aliases: ['min7', '-7'], allowed: [0, 3, 7, 10], required: [0, 3, 10], priority: 9 },
+  { suffix: 'sus2', aliases: ['2'], allowed: [0, 2, 7], required: [0, 2], priority: 8 },
+  { suffix: 'sus4', aliases: ['sus'], allowed: [0, 5, 7], required: [0, 5], priority: 8 },
+  { suffix: '7sus4', aliases: ['7sus'], allowed: [0, 5, 7, 10], required: [0, 5, 10], priority: 8 },
+  { suffix: 'add9', aliases: ['add2'], allowed: [0, 2, 4, 7], required: [0, 2, 4], priority: 8 },
+  { suffix: 'm(add9)', aliases: ['madd9', 'madd2'], allowed: [0, 2, 3, 7], required: [0, 2, 3], priority: 7 },
+  { suffix: '6', aliases: ['maj6'], allowed: [0, 4, 7, 9], required: [0, 4, 9], priority: 7 },
+  { suffix: 'm6', aliases: ['min6'], allowed: [0, 3, 7, 9], required: [0, 3, 9], priority: 7 },
+  { suffix: 'dim', aliases: ['o'], allowed: [0, 3, 6], required: [0, 3, 6], priority: 7 },
+  { suffix: 'dim7', aliases: ['o7'], allowed: [0, 3, 6, 9], required: [0, 3, 6, 9], priority: 7 },
+  { suffix: 'm7b5', aliases: ['m7-5', 'ø'], allowed: [0, 3, 6, 10], required: [0, 3, 6, 10], priority: 7 },
+  { suffix: 'aug', aliases: ['+', '+5'], allowed: [0, 4, 8], required: [0, 4, 8], priority: 7 },
+  { suffix: '7#5', aliases: ['7+5', '7+', 'aug7'], allowed: [0, 4, 8, 10], required: [0, 4, 8, 10], priority: 6 },
+  { suffix: '7b5', aliases: ['7-5'], allowed: [0, 4, 6, 10], required: [0, 4, 6, 10], priority: 6 },
+  { suffix: '7b9', aliases: ['7-9'], allowed: [0, 1, 4, 7, 10], required: [0, 1, 4, 10], priority: 6 },
+  { suffix: '9', aliases: [], allowed: [0, 2, 4, 7, 10], required: [0, 2, 4, 10], priority: 7 },
+  { suffix: 'm9', aliases: ['min9'], allowed: [0, 2, 3, 7, 10], required: [0, 2, 3, 10], priority: 7 },
+  { suffix: 'maj9', aliases: ['M9'], allowed: [0, 2, 4, 7, 11], required: [0, 2, 4, 11], priority: 7 },
+  { suffix: '9sus4', aliases: [], allowed: [0, 2, 5, 7, 10], required: [0, 2, 5, 10], priority: 6 },
+  { suffix: 'm(maj7)', aliases: ['mmaj7', 'mM7', 'minmaj7'], allowed: [0, 3, 7, 11], required: [0, 3, 11], priority: 6 },
+];
+
+/**
+ * Finds the matching formula entry for a raw quality string (e.g. '', 'm', 'M7', 'add9').
+ */
+export const findChordFormula = (rawQuality = '') => {
+  const q = String(rawQuality || '').trim().replace(/^\(|\)$/g, '');
+  for (const f of CHORD_FORMULAS) {
+    if (f.suffix === q) return f;
+    if (f.aliases.some((a) => a.toLowerCase() === q.toLowerCase())) return f;
+    if (f.suffix.toLowerCase() === q.toLowerCase() && q !== 'M' && q !== 'm') return f;
+  }
+  return null;
+};
+
+/**
  * Computes the allowed and required pitch classes (0..11) for a chord's root, quality, and optional slash bass.
- * Used to harmonically validate custom chord fingerings in `## Chords` / `## Fingerings`.
  */
 export const getChordExpectedPitchClasses = (rootSemitone, rawQuality = '', bassSemitone = null) => {
-  const q = String(rawQuality || '').trim().replace(/^\(|\)$/g, '');
-
-  let allowedIntervals = [0, 4, 7];
-  let requiredIntervals = [0, 4];
-
-  if (!q || q === 'M' || /^maj$/i.test(q)) {
-    allowedIntervals = [0, 4, 7];
-    requiredIntervals = [0, 4];
-  } else if (q === '5') {
-    allowedIntervals = [0, 7];
-    requiredIntervals = [0, 7];
-  } else if (q === 'm' || /^min$/i.test(q) || q === '-') {
-    allowedIntervals = [0, 3, 7];
-    requiredIntervals = [0, 3];
-  } else if (q === '7' || /^dom7$/i.test(q)) {
-    allowedIntervals = [0, 4, 7, 10];
-    requiredIntervals = [0, 4, 10];
-  } else if (q === 'M7' || /^maj7$/i.test(q)) {
-    allowedIntervals = [0, 4, 7, 11];
-    requiredIntervals = [0, 4, 11];
-  } else if (/^m(in)?7$/i.test(q) || q === '-7') {
-    allowedIntervals = [0, 3, 7, 10];
-    requiredIntervals = [0, 3, 10];
-  } else if (/^m(in)?(M7|maj7)$/i.test(q)) {
-    allowedIntervals = [0, 3, 7, 11];
-    requiredIntervals = [0, 3, 11];
-  } else if (/^sus2$/i.test(q) || q === '2') {
-    allowedIntervals = [0, 2, 7];
-    requiredIntervals = [0, 2];
-  } else if (/^sus4?$/i.test(q)) {
-    allowedIntervals = [0, 5, 7];
-    requiredIntervals = [0, 5];
-  } else if (/^(7sus4|7sus)$/i.test(q)) {
-    allowedIntervals = [0, 5, 7, 10];
-    requiredIntervals = [0, 5, 10];
-  } else if (/^9sus4$/i.test(q)) {
-    allowedIntervals = [0, 2, 5, 7, 10];
-    requiredIntervals = [0, 2, 5, 10];
-  } else if (/^(dim|o)$/i.test(q)) {
-    allowedIntervals = [0, 3, 6];
-    requiredIntervals = [0, 3, 6];
-  } else if (/^(dim7|o7)$/i.test(q)) {
-    allowedIntervals = [0, 3, 6, 9];
-    requiredIntervals = [0, 3, 6, 9];
-  } else if (/^(m7b5|m7-5|ø)$/i.test(q)) {
-    allowedIntervals = [0, 3, 6, 10];
-    requiredIntervals = [0, 3, 6, 10];
-  } else if (/^(aug|\+|\+5)$/i.test(q)) {
-    allowedIntervals = [0, 4, 8];
-    requiredIntervals = [0, 4, 8];
-  } else if (/^(7#5|7\+5|7\+|aug7)$/i.test(q)) {
-    allowedIntervals = [0, 4, 8, 10];
-    requiredIntervals = [0, 4, 8, 10];
-  } else if (/^(7b5|7-5)$/i.test(q)) {
-    allowedIntervals = [0, 4, 6, 10];
-    requiredIntervals = [0, 4, 6, 10];
-  } else if (/^(7b9|7-9)$/i.test(q)) {
-    allowedIntervals = [0, 1, 4, 7, 10];
-    requiredIntervals = [0, 1, 4, 10];
-  } else if (q === '6' || /^maj6$/i.test(q)) {
-    allowedIntervals = [0, 4, 7, 9];
-    requiredIntervals = [0, 4, 9];
-  } else if (/^m(in)?6$/i.test(q)) {
-    allowedIntervals = [0, 3, 7, 9];
-    requiredIntervals = [0, 3, 9];
-  } else if (/^(add9|add2)$/i.test(q)) {
-    allowedIntervals = [0, 2, 4, 7];
-    requiredIntervals = [0, 2, 4];
-  } else if (/^m(in)?(add9|add2)$/i.test(q)) {
-    allowedIntervals = [0, 2, 3, 7];
-    requiredIntervals = [0, 2, 3];
-  } else if (q === '9') {
-    allowedIntervals = [0, 2, 4, 7, 10];
-    requiredIntervals = [0, 2, 4, 10];
-  } else if (/^m(in)?9$/i.test(q)) {
-    allowedIntervals = [0, 2, 3, 7, 10];
-    requiredIntervals = [0, 2, 3, 10];
-  } else if (/^(M9|maj9)$/i.test(q)) {
-    allowedIntervals = [0, 2, 4, 7, 11];
-    requiredIntervals = [0, 2, 4, 11];
-  } else {
+  const formula = findChordFormula(rawQuality);
+  if (!formula) {
     return null;
   }
 
-  const allowedPcs = new Set(allowedIntervals.map((iv) => (rootSemitone + iv) % 12));
-  const requiredPcs = new Set(requiredIntervals.map((iv) => (rootSemitone + iv) % 12));
+  const allowedPcs = new Set(formula.allowed.map((iv) => (rootSemitone + iv) % 12));
+  const requiredPcs = new Set(formula.required.map((iv) => (rootSemitone + iv) % 12));
   if (bassSemitone !== null && bassSemitone !== undefined) {
     allowedPcs.add(bassSemitone);
     requiredPcs.add(bassSemitone);
@@ -218,7 +184,149 @@ export const getChordExpectedPitchClasses = (rootSemitone, rawQuality = '', bass
 };
 
 /**
+ * Reverse-identifies the most likely chord names (with confidence %) for a given fret array.
+ * Reusable in the Linter, DB build diagnostics, and any future in-app Chord Editor!
+ *
+ * @param {number[]} frets - Array of 6 (guitar) or 4 (ukulele) fret integers (-1 for muted 'x')
+ * @param {'guitar'|'ukulele'} instrument
+ * @param {object} options - { targetRootSemitone: number|null, targetRootStr: string|null, maxResults: number }
+ * @returns {Array<{ chord: string, confidence: number }>}
+ */
+export const suggestChordsForVoicing = (
+  frets,
+  instrument = 'guitar',
+  { targetRootSemitone = null, targetRootStr = null, maxResults = 3 } = {}
+) => {
+  if (!Array.isArray(frets) || (frets.length !== 6 && frets.length !== 4)) {
+    return [];
+  }
+
+  const openPcs =
+    instrument === 'ukulele' ? UKULELE_OPEN_PITCH_CLASSES : GUITAR_OPEN_PITCH_CLASSES;
+  const soundedPcs = new Set();
+  let lowestSoundedPc = null;
+
+  for (let i = 0; i < frets.length; i++) {
+    const f = frets[i];
+    if (f < 0) continue;
+    const pc = (openPcs[i] + f) % 12;
+    if (lowestSoundedPc === null) {
+      lowestSoundedPc = pc;
+    }
+    soundedPcs.add(pc);
+  }
+
+  if (soundedPcs.size === 0) {
+    return [];
+  }
+
+  const soundedArr = [...soundedPcs];
+  const candidateRoots =
+    targetRootSemitone !== null && targetRootSemitone !== undefined
+      ? [targetRootSemitone]
+      : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+  const scoredCandidates = [];
+
+  for (const rootPc of candidateRoots) {
+    const rootName =
+      targetRootSemitone === rootPc && targetRootStr
+        ? targetRootStr
+        : SHARP_NOTES[rootPc];
+
+    for (const formula of CHORD_FORMULAS) {
+      const allowedSet = new Set(formula.allowed.map((iv) => (rootPc + iv) % 12));
+      const requiredArr = formula.required.map((iv) => (rootPc + iv) % 12);
+
+      const matchingCount = soundedArr.filter((pc) => allowedSet.has(pc)).length;
+      const wrongCount = soundedArr.length - matchingCount;
+      const presentReqCount = requiredArr.filter((pc) => soundedPcs.has(pc)).length;
+      const missingReqCount = requiredArr.length - presentReqCount;
+
+      // Skip completely unrelated chords
+      if (matchingCount === 0 || wrongCount > 1) continue;
+      if (targetRootSemitone === null && !soundedPcs.has(rootPc)) continue;
+
+      const bassMatchesRoot = lowestSoundedPc === rootPc;
+      let chordLabel = `${rootName}${formula.suffix}`;
+      let confidence = 0;
+
+      if (wrongCount === 0 && missingReqCount === 0) {
+        // Every played note belongs to the chord AND all required tones are present!
+        const coverageRatio = soundedArr.length / formula.allowed.length;
+        if (instrument === 'guitar' && !bassMatchesRoot && lowestSoundedPc !== null) {
+          // It's an inversion / slash chord (e.g. D/F# or Cadd9/E)
+          if (targetRootSemitone === rootPc) {
+            chordLabel = `${rootName}${formula.suffix}/${SHARP_NOTES[lowestSoundedPc]}`;
+            confidence = Math.round(92 + Math.min(6, coverageRatio * 6));
+          } else {
+            // In global search ("X: ..."), offer both the root-position interpretation and slash chord
+            chordLabel = `${rootName}${formula.suffix}/${SHARP_NOTES[lowestSoundedPc]}`;
+            confidence = Math.round(78 + Math.min(10, coverageRatio * 8) + formula.priority * 0.4);
+          }
+        } else {
+          // Exact root-position match!
+          confidence = Math.min(
+            100,
+            Math.round(94 + Math.min(6, coverageRatio * 6))
+          );
+        }
+      } else {
+        // Partial / near match (e.g. missing 1 chord tone or 1 wrong finger)
+        const noteAccuracy = matchingCount / soundedArr.length;
+        const reqCoverage = presentReqCount / requiredArr.length;
+        const bassBonus = bassMatchesRoot ? 10 : 0;
+        confidence = Math.round(
+          noteAccuracy * 45 + reqCoverage * 38 + bassBonus + formula.priority * 0.5
+        );
+        confidence = Math.max(20, Math.min(89, confidence));
+      }
+
+      scoredCandidates.push({
+        chord: chordLabel,
+        confidence,
+        exact: wrongCount === 0 && missingReqCount === 0 && bassMatchesRoot,
+        priority: formula.priority,
+      });
+    }
+  }
+
+  scoredCandidates.sort((a, b) => {
+    if (b.exact !== a.exact) return (b.exact ? 1 : 0) - (a.exact ? 1 : 0);
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    return b.priority - a.priority;
+  });
+
+  // Deduplicate by chord label and return top N
+  const unique = [];
+  const seen = new Set();
+  for (const item of scoredCandidates) {
+    if (seen.has(item.chord)) continue;
+    seen.add(item.chord);
+    unique.push({ chord: item.chord, confidence: item.confidence });
+    if (unique.length >= maxResults) break;
+  }
+
+  return unique;
+};
+
+/**
+ * Formats an array of `{ chord, confidence }` into `"Did you mean: G5 (100%), G (79%)?"`.
+ */
+export const formatChordSuggestionsText = (suggestions = []) => {
+  if (!Array.isArray(suggestions) || suggestions.length === 0) {
+    return '';
+  }
+  const listStr = suggestions
+    .map((s) => `${s.chord} (${s.confidence}%)`)
+    .join(', ');
+  return ` Did you mean: ${listStr}?`;
+};
+
+/**
  * Validates that the notes sounded by `frets` on `instrument` harmonically match `chordName`.
+ * When a mismatch occurs, automatically computes "Did you mean: ...?" suggestions for that root
+ * (or across all roots if no close variation on the same root exists).
  */
 export const validateVoicingHarmony = (
   chordName,
@@ -226,11 +334,12 @@ export const validateVoicingHarmony = (
   quality,
   bassSemitone,
   frets,
-  instrument = 'guitar'
+  instrument = 'guitar',
+  rootStr = null
 ) => {
   const expected = getChordExpectedPitchClasses(rootSemitone, quality, bassSemitone);
   if (!expected) {
-    return { valid: true };
+    return { valid: true, suggestions: [] };
   }
 
   const { allowedPcs, requiredPcs } = expected;
@@ -259,6 +368,7 @@ export const validateVoicingHarmony = (
   if (soundedPcs.size === 0) {
     return {
       valid: false,
+      suggestions: [],
       error: `Fingering for '${chordName}' mutes all strings.`,
     };
   }
@@ -292,62 +402,44 @@ export const validateVoicingHarmony = (
   }
 
   if (issues.length > 0) {
+    // 1. Check variations of the user's intended root first (e.g. G -> G5, Gsus4, G7)
+    let suggestions = suggestChordsForVoicing(frets, instrument, {
+      targetRootSemitone: rootSemitone,
+      targetRootStr: rootStr || SHARP_NOTES[rootSemitone],
+      maxResults: 3,
+    }).filter((s) => s.chord !== chordName && s.confidence >= 70);
+
+    // 2. Also include top global matches if no high-confidence same-root match was found
+    if (suggestions.length === 0 || suggestions[0].confidence < 90) {
+      const globalSuggs = suggestChordsForVoicing(frets, instrument, {
+        maxResults: 3,
+      }).filter((s) => s.chord !== chordName);
+      const seen = new Set(suggestions.map((s) => s.chord));
+      for (const gs of globalSuggs) {
+        if (!seen.has(gs.chord)) {
+          suggestions.push(gs);
+          seen.add(gs.chord);
+        }
+        if (suggestions.length >= 3) break;
+      }
+    }
+
     return {
       valid: false,
-      error: `Harmonic mismatch in '${chordName}': ${issues.join('; ')}.`,
+      suggestions,
+      error: `Harmonic mismatch in '${chordName}': ${issues.join('; ')}.${formatChordSuggestionsText(suggestions)}`,
     };
   }
 
-  return { valid: true };
+  return { valid: true, suggestions: [] };
 };
 
 /**
- * Parses and harmonically validates a single plain-text chord fingering definition line
- * inside `## Chords` / `## Fingerings`.
+ * Helper to parse the right-hand fret pattern (`3x003x` or `0212`) before/independent of chord name validation,
+ * so even an unknown chord name like `X: 3x003x` can receive fret-based chord recommendations!
  */
-export const parseFingeringDefinitionLine = (rawLine = '') => {
-  const trimmed = String(rawLine || '').replace(/\s+#.*$/, '').trim();
-  if (!trimmed || trimmed.startsWith('#')) {
-    return null;
-  }
-
-  const colonIdx = trimmed.indexOf(':');
-  if (colonIdx === -1) {
-    return {
-      valid: false,
-      error: `Missing ':' separator in chord fingering line (expected e.g. 'Em7: 022030' or 'G7 (uke): 0212').`,
-    };
-  }
-
-  const leftSide = trimmed.slice(0, colonIdx).trim();
-  let rightSide = trimmed.slice(colonIdx + 1).trim();
-
-  let explicitInstrument = null;
-  let chordName = leftSide;
-  const instMatch = /^(\S+)\s+\((guitar|gtr|uke|ukulele)\)$/i.exec(leftSide);
-  if (instMatch) {
-    chordName = instMatch[1].trim();
-    const tag = instMatch[2].toLowerCase();
-    explicitInstrument = tag.startsWith('uk') ? 'ukulele' : 'guitar';
-  }
-
-  const chordMatch = /^([A-G][#b]?)([^/]*?)(?:\/([A-G][#b]?))?$/.exec(chordName);
-  if (
-    !chordMatch ||
-    NOTE_TO_SEMITONE[chordMatch[1]] === undefined ||
-    !CHORD_QUALITY_REGEX.test(chordMatch[2] || '') ||
-    (chordMatch[3] && NOTE_TO_SEMITONE[chordMatch[3]] === undefined)
-  ) {
-    return {
-      valid: false,
-      error: `Invalid chord name '${chordName}' in fingering definition.`,
-    };
-  }
-
-  const rootSemitone = NOTE_TO_SEMITONE[chordMatch[1]];
-  const quality = chordMatch[2] || '';
-  const bassSemitone = chordMatch[3] ? NOTE_TO_SEMITONE[chordMatch[3]] : null;
-
+const parseFretPatternRightSide = (rawRightSide = '', explicitInstrument = null, chordNameForMsg = '') => {
+  let rightSide = String(rawRightSide || '').trim();
   let label = null;
   const quoteMatch = /^(.*?)\s+["'](.+)["']\s*$/.exec(rightSide);
   if (quoteMatch) {
@@ -365,7 +457,7 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
   if (rawFretTokens.length !== 6 && rawFretTokens.length !== 4) {
     return {
       valid: false,
-      error: `Fret pattern '${rightSide}' for '${chordName}' must have 6 strings (Guitar, e.g. '022030') or 4 strings (Ukulele, e.g. '0212'); found ${rawFretTokens.length}.`,
+      error: `Fret pattern '${rightSide}' for '${chordNameForMsg}' must have 6 strings (Guitar, e.g. '022030') or 4 strings (Ukulele, e.g. '0212'); found ${rawFretTokens.length}.`,
     };
   }
 
@@ -378,14 +470,14 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
       if (fNum < 0 || fNum > 24) {
         return {
           valid: false,
-          error: `Fret number '${fNum}' out of range (0..24) in '${chordName}: ${rightSide}'.`,
+          error: `Fret number '${fNum}' out of range (0..24) in '${chordNameForMsg}: ${rightSide}'.`,
         };
       }
       frets.push(fNum);
     } else {
       return {
         valid: false,
-        error: `Invalid fret token '${tok}' in '${chordName}: ${rightSide}' (use digits 0-24 or 'x').`,
+        error: `Invalid fret token '${tok}' in '${chordNameForMsg}: ${rightSide}' (use digits 0-24 or 'x').`,
       };
     }
   }
@@ -403,17 +495,110 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
     };
   }
 
+  return {
+    valid: true,
+    frets,
+    instrument,
+    label,
+  };
+};
+
+/**
+ * Parses and harmonically validates a single plain-text chord fingering definition line
+ * inside `## Chords` / `## Fingerings`.
+ * Supports recommendations for both invalid chord names (`X: 3x003x`) and harmonic mismatches (`G: 3x003x`).
+ */
+export const parseFingeringDefinitionLine = (rawLine = '') => {
+  const trimmed = String(rawLine || '').replace(/\s+#.*$/, '').trim();
+  if (!trimmed || trimmed.startsWith('#')) {
+    return null;
+  }
+
+  const colonIdx = trimmed.indexOf(':');
+  if (colonIdx === -1) {
+    return {
+      valid: false,
+      error: `Missing ':' separator in chord fingering line (expected e.g. 'Em7: 022030' or 'G7 (uke): 0212').`,
+    };
+  }
+
+  const leftSide = trimmed.slice(0, colonIdx).trim();
+  const rightSide = trimmed.slice(colonIdx + 1).trim();
+
+  let explicitInstrument = null;
+  let chordName = leftSide;
+  const instMatch = /^(\S+)\s+\((guitar|gtr|uke|ukulele)\)$/i.exec(leftSide);
+  if (instMatch) {
+    chordName = instMatch[1].trim();
+    const tag = instMatch[2].toLowerCase();
+    explicitInstrument = tag.startsWith('uk') ? 'ukulele' : 'guitar';
+  }
+
+  // Parse fret pattern first so we can suggest chords even when `chordName` is invalid (e.g. `X: 3x003x`)
+  const fretParse = parseFretPatternRightSide(rightSide, explicitInstrument, chordName);
+
+  const chordMatch = /^([A-G][#b]?)([^/]*?)(?:\/([A-G][#b]?))?$/.exec(chordName);
+  const isChordSyntaxValid =
+    Boolean(chordMatch) &&
+    NOTE_TO_SEMITONE[chordMatch[1]] !== undefined &&
+    CHORD_QUALITY_REGEX.test(chordMatch[2] || '') &&
+    (!chordMatch[3] || NOTE_TO_SEMITONE[chordMatch[3]] !== undefined);
+
+  if (!isChordSyntaxValid) {
+    let suggestionSuffix = '';
+    let suggestions = [];
+    if (fretParse.valid) {
+      // If the user typed a valid root note with a typo in the quality (e.g. `Gmaj77: ...`), prioritize that root
+      const rootPrefixMatch = /^([A-G][#b]?)/.exec(chordName);
+      const rootHintSemitone =
+        rootPrefixMatch && NOTE_TO_SEMITONE[rootPrefixMatch[1]] !== undefined
+          ? NOTE_TO_SEMITONE[rootPrefixMatch[1]]
+          : null;
+      suggestions = suggestChordsForVoicing(fretParse.frets, fretParse.instrument, {
+        targetRootSemitone: rootHintSemitone,
+        targetRootStr: rootPrefixMatch ? rootPrefixMatch[1] : null,
+        maxResults: 3,
+      });
+      if (suggestions.length === 0 && rootHintSemitone !== null) {
+        suggestions = suggestChordsForVoicing(fretParse.frets, fretParse.instrument, {
+          maxResults: 3,
+        });
+      }
+      suggestionSuffix = formatChordSuggestionsText(suggestions);
+    }
+    return {
+      valid: false,
+      suggestions,
+      error: `Invalid chord name '${chordName}' in fingering definition.${suggestionSuffix}`,
+    };
+  }
+
+  if (!fretParse.valid) {
+    return {
+      valid: false,
+      suggestions: [],
+      error: fretParse.error,
+    };
+  }
+
+  const rootStr = chordMatch[1];
+  const rootSemitone = NOTE_TO_SEMITONE[rootStr];
+  const quality = chordMatch[2] || '';
+  const bassSemitone = chordMatch[3] ? NOTE_TO_SEMITONE[chordMatch[3]] : null;
+
   const harmonyCheck = validateVoicingHarmony(
     chordName,
     rootSemitone,
     quality,
     bassSemitone,
-    frets,
-    instrument
+    fretParse.frets,
+    fretParse.instrument,
+    rootStr
   );
   if (!harmonyCheck.valid) {
     return {
       valid: false,
+      suggestions: harmonyCheck.suggestions || [],
       error: harmonyCheck.error,
     };
   }
@@ -421,9 +606,10 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
   return {
     valid: true,
     chordName,
-    instrument,
-    frets,
-    label,
+    instrument: fretParse.instrument,
+    frets: fretParse.frets,
+    label: fretParse.label,
+    suggestions: [],
   };
 };
 
@@ -582,7 +768,6 @@ export const parseFrontmatterFile = (rawText) => {
   const lines = yamlBlock.split('\n');
   const rawAfterClose = normalized.slice(endIdx + 5);
   const strippedLeadingNewline = rawAfterClose.startsWith('\n');
-  // Line 1 is opening '---' (1) + yamlBlock lines (lines.length) + closing '---' (1) + first body line (1) + optional stripped '\n'
   const bodyStartLine = lines.length + 3 + (strippedLeadingNewline ? 1 : 0);
   const content = strippedLeadingNewline ? rawAfterClose.slice(1) : rawAfterClose;
   const data = {};
