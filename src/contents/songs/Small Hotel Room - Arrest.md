@@ -15,11 +15,11 @@ youtube: OXMum1a_3jk
 ---
 (Em7  Em7)
 
-(Em7  Em7  G  D/F#)  (Em7  Em7  G  D/F#)
+(Em7  Em7  G5  D/F#)  (Em7  Em7  G5  D/F#)
 Huu... hu hu... Hu... u u u uh...
 Ohhh... oh oh... Ohh... o o oh oh...
 
-(Em7  Em7  G  D/F#)  (Em7  Em7  G  D/F#)
+(Em7  Em7  G5  D/F#)  (Em7  Em7  G5  D/F#)
 I don't know who made this plan
 Somehow my statistics seemed to fail, oh oh
 I made all the numbers clear, put my head to it - took a year, oh oh
@@ -29,7 +29,7 @@ Your dad has to arrest me
 
 (Em7  Em7)
 
-(Em7  Em7  G  D/F#)  (Em7  Em7  G  D/F#)
+(Em7  Em7  G5  D/F#)  (Em7  Em7  G5  D/F#)
 Huu... hu hu... Ohh... o o oh oh...
 Huu... hu hu... Ohh... o o oh oh...
 
@@ -46,13 +46,13 @@ Your dad has to arrest me
 
 (Em7  Em7)
 
-(Em7  Em7  G  D/F#)  (Em7  Em7  G  D/F#)
+(Em7  Em7  G5  D/F#)  (Em7  Em7  G5  D/F#)
 Huu... hu hu... Ohh... o o oh oh...
 Huu... hu hu... Ohh... o o oh oh...
 
-(Em7  Em7  G  G)  (Em7  Em7  G  D)
+(Em7  Em7  G5  G5)  (Em7  Em7  G5  D/F#)
 
-(Em7  Em7  G  G)  (Em7  Em7  G  G)
+(Em7  Em7  G5  G5)  (Em7  Em7  G5  G5)
 Don't try to seize me
 extract me or conceal
 I'll climb, walk, jump off, race you
@@ -63,21 +63,21 @@ Your dad has to arrest you
 
 (Em7  Em7)
 
-(Em7  Em7  G  D/F#)  (Em7  Em7  G  D/F#)
+(Em7  Em7  G5  D/F#)  (Em7  Em7  G5  D/F#)
 Huu... hu hu... Ohh... o o oh oh...
 Huu... hu hu... Ohh... o o oh oh...
 
-(Em7  Em7  G  G)  (Em7  Em7  G  G)
+(Em7  Em7  G5  G5)  (Em7  Em7  G5  G5)
 Arrest you, arrest you, arrest you
 No black ops, just your organized crime
 Arrest you, arrest you, arrest you
 Your father and I found out on time
 
-(Csus2  Csus2_Csus2!  ..)  (Em7_D/G  G)
+(Csus2  Csus2_Csus2!  ..)  (Em7_D/G  G5)
 
 ## Chords
 Em7: 02203x
-G: 32003x
+G5: 3x003x
 D/F#: 20023x
 Csus2: x3003x
 D: x5777x
