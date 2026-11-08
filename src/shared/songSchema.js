@@ -1,12 +1,13 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.9.0
+ * @version 2.10.0
  * Single Source of Truth for Frontmatter Schema, Inline Chord Notation Grammar,
- * Markdown `##` Section & Harmonic Fingering Postures Schema, Reverse Chord Voicing
- * Identification (`suggestChordsForVoicing`), and Syntax Highlighting Color Palettes.
+ * Custom Tuning Parser (`parseInstrumentTuning`), Markdown `##` Section & Harmonic
+ * Fingering Postures Schema, Reverse Chord Voicing Identification (`suggestChordsForVoicing`),
+ * and Syntax Highlighting Color Palettes.
  */
 
-export const __version__ = '2.9.0';
+export const __version__ = '2.10.0';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -50,6 +51,7 @@ export const TREATED_KEYS = [
   "time_signature",
   "title",
   "track",
+  "tuning",
   "url",
   "writer",
   "youtube"
@@ -83,11 +85,160 @@ export const NOTE_TO_SEMITONE = {
   Cb: 11,
 };
 
-// Standard open-string pitch classes (0=C .. 11=B)
+// Standard open-string MIDI pitches & pitch classes (0=C .. 11=B)
+export const GUITAR_OPEN_MIDI = [40, 45, 50, 55, 59, 64]; // E2, A2, D3, G3, B3, E4
 export const GUITAR_OPEN_PITCH_CLASSES = [4, 9, 2, 7, 11, 4]; // 6E, 5A, 4D, 3G, 2B, 1e
+export const GUITAR_STRING_NAMES = ['E', 'A', 'D', 'G', 'B', 'e'];
 export const GUITAR_STRING_LABELS = ['6 (E)', '5 (A)', '4 (D)', '3 (G)', '2 (B)', '1 (e)'];
+
+export const UKULELE_OPEN_MIDI = [67, 60, 64, 69]; // G4, C4, E4, A4
 export const UKULELE_OPEN_PITCH_CLASSES = [7, 0, 4, 9]; // 4G, 3C, 2E, 1A
+export const UKULELE_STRING_NAMES = ['G', 'C', 'E', 'A'];
 export const UKULELE_STRING_LABELS = ['4 (G)', '3 (C)', '2 (E)', '1 (A)'];
+
+/**
+ * Parses a YAML `tuning:` frontmatter string for Guitar (6 strings) or Ukulele (4 strings).
+ * Supports BOTH:
+ *   1. Semitone offsets per string: e.g. `-2 0 -2 -2 -2 0` (Cracks: lowering 1 tone on strings 6, 4, 3, 2)
+ *   2. Note names per string:       e.g. `D A C F A E` or `D2 A2 C3 F3 A3 E4`
+ *
+ * Returns `{ valid, openMidis, openPcs, stringNames, stringLabels, offsets, displayStr, error }`.
+ */
+export const parseInstrumentTuning = (rawTuning = null, instrument = 'guitar') => {
+  const isUke = instrument === 'ukulele';
+  const baseMidis = isUke ? UKULELE_OPEN_MIDI : GUITAR_OPEN_MIDI;
+  const basePcs = isUke ? UKULELE_OPEN_PITCH_CLASSES : GUITAR_OPEN_PITCH_CLASSES;
+  const baseNames = isUke ? UKULELE_STRING_NAMES : GUITAR_STRING_NAMES;
+  const baseLabels = isUke ? UKULELE_STRING_LABELS : GUITAR_STRING_LABELS;
+  const expectedCount = baseMidis.length;
+
+  const defaultResult = {
+    valid: true,
+    isCustom: false,
+    openMidis: [...baseMidis],
+    openPcs: [...basePcs],
+    stringNames: [...baseNames],
+    stringLabels: [...baseLabels],
+    offsets: new Array(expectedCount).fill(0),
+    displayStr: baseNames.join(' '),
+  };
+
+  if (!rawTuning || typeof rawTuning !== 'string' || !rawTuning.trim()) {
+    return defaultResult;
+  }
+
+  const tokens = rawTuning
+    .trim()
+    .split(/[\s,;]+/)
+    .filter(Boolean);
+
+  if (tokens.length !== expectedCount) {
+    // If tuning is a 6-string guitar tuning but we are querying ukulele (4 strings), return default uke tuning
+    if (isUke && tokens.length === 6) {
+      return defaultResult;
+    }
+    return {
+      ...defaultResult,
+      valid: false,
+      error: `Invalid tuning '${rawTuning}': expected ${expectedCount} string values (e.g. 'D A C F A E' or '-2 0 -2 -2 -2 0'), found ${tokens.length}.`,
+    };
+  }
+
+  const openMidis = [];
+  const openPcs = [];
+  const stringNames = [];
+  const stringLabels = [];
+  const offsets = [];
+
+  for (let i = 0; i < expectedCount; i++) {
+    const tok = tokens[i];
+    const stringNumber = expectedCount - i; // 6..1 for guitar, 4..1 for uke
+
+    // Case A: Semitone offset like "-2", "0", "+1"
+    if (/^[+-]?\d+$/.test(tok)) {
+      const off = parseInt(tok, 10);
+      if (off < -12 || off > 12) {
+        return {
+          ...defaultResult,
+          valid: false,
+          error: `Tuning offset '${tok}' on string ${stringNumber} out of range (-12..+12).`,
+        };
+      }
+      const midi = baseMidis[i] + off;
+      const pc = ((basePcs[i] + off) % 12 + 12) % 12;
+      const noteName = SHARP_NOTES[pc];
+      const dispName = i === expectedCount - 1 && !isUke ? noteName.toLowerCase() : noteName;
+      openMidis.push(midi);
+      openPcs.push(pc);
+      stringNames.push(dispName);
+      stringLabels.push(`${stringNumber} (${noteName})`);
+      offsets.push(off);
+      continue;
+    }
+
+    // Case B: Note name like "D", "F#", "Eb", or with octave "D2"
+    const noteMatch = /^([A-Ga-g][#b]?)(\d)?$/.exec(tok);
+    if (!noteMatch) {
+      return {
+        ...defaultResult,
+        valid: false,
+        error: `Invalid tuning token '${tok}' on string ${stringNumber} (use note names like 'D A C F A E' or semitone offsets like '-2 0 -2 -2 -2 0').`,
+      };
+    }
+
+    const canonicalNote =
+      noteMatch[1].charAt(0).toUpperCase() + noteMatch[1].slice(1);
+    const targetPc = NOTE_TO_SEMITONE[canonicalNote];
+    if (targetPc === undefined) {
+      return {
+        ...defaultResult,
+        valid: false,
+        error: `Unknown note '${tok}' in tuning.`,
+      };
+    }
+
+    // Compute closest semitone offset to standard string pitch (biasing toward lowering strings, -7..+4)
+    let diff = (targetPc - basePcs[i] + 12) % 12;
+    if (diff > 4) {
+      diff -= 12;
+    }
+    const midi = noteMatch[2]
+      ? (parseInt(noteMatch[2], 10) + 1) * 12 + targetPc
+      : baseMidis[i] + diff;
+    const off = midi - baseMidis[i];
+    const dispName =
+      i === expectedCount - 1 && !isUke && canonicalNote.length === 1
+        ? canonicalNote.toLowerCase()
+        : canonicalNote;
+
+    openMidis.push(midi);
+    openPcs.push(targetPc);
+    stringNames.push(dispName);
+    stringLabels.push(`${stringNumber} (${canonicalNote})`);
+    offsets.push(off);
+  }
+
+  const isCustom = offsets.some((o) => o !== 0);
+  const offsetSummary = offsets
+    .map((o, idx) =>
+      o !== 0 ? `${expectedCount - idx}:${o > 0 ? `+${o}` : o}` : null
+    )
+    .filter(Boolean)
+    .join(', ');
+
+  return {
+    valid: true,
+    isCustom,
+    openMidis,
+    openPcs,
+    stringNames,
+    stringLabels,
+    offsets,
+    displayStr: isCustom
+      ? `${stringNames.join(' ')} (${offsetSummary})`
+      : stringNames.join(' '),
+  };
+};
 
 // Parenthetical metadata/directives that should never be transposed as chords
 export const SKIP_PAREN_PREFIXES = [
@@ -158,14 +309,12 @@ export const CHORD_FORMULAS = [
 export const findChordFormula = (rawQuality = '') => {
   const q = String(rawQuality || '').trim().replace(/^\(|\)$/g, '');
 
-  // Pass 1: Exact case-sensitive match on suffix or aliases (critical for 'm7' vs 'M7' and 'm' vs 'M')
   for (const f of CHORD_FORMULAS) {
     if (f.suffix === q || f.aliases.includes(q)) {
       return f;
     }
   }
 
-  // Pass 2: Case-insensitive match ONLY for multi-letter word tokens (maj, min, dim, aug, sus, add, dom)
   if (!/^[mM][0-9]?$/.test(q)) {
     const qLower = q.toLowerCase();
     for (const f of CHORD_FORMULAS) {
@@ -205,32 +354,33 @@ export const getChordExpectedPitchClasses = (rootSemitone, rawQuality = '', bass
 };
 
 /**
- * Reverse-identifies the most likely chord names (with confidence %) for a given fret array.
- * Reusable in the Linter, DB build diagnostics, and any future in-app Chord Editor!
- *
- * @param {number[]} frets - Array of 6 (guitar) or 4 (ukulele) fret integers (-1 for muted 'x')
- * @param {'guitar'|'ukulele'} instrument
- * @param {object} options - { targetRootSemitone: number|null, targetRootStr: string|null, maxResults: number }
- * @returns {Array<{ chord: string, confidence: number }>}
+ * Reverse-identifies the most likely chord names (with confidence %) for a given fret array,
+ * accounting for custom song tuning (`customTuningStr`) and/or pitch shift (`pitchShiftSemitones`).
  */
 export const suggestChordsForVoicing = (
   frets,
   instrument = 'guitar',
-  { targetRootSemitone = null, targetRootStr = null, maxResults = 3 } = {}
+  {
+    targetRootSemitone = null,
+    targetRootStr = null,
+    maxResults = 3,
+    customTuningStr = null,
+    pitchShiftSemitones = 0,
+  } = {}
 ) => {
   if (!Array.isArray(frets) || (frets.length !== 6 && frets.length !== 4)) {
     return [];
   }
 
-  const openPcs =
-    instrument === 'ukulele' ? UKULELE_OPEN_PITCH_CLASSES : GUITAR_OPEN_PITCH_CLASSES;
+  const tuningInfo = parseInstrumentTuning(customTuningStr, instrument);
+  const openPcs = tuningInfo.openPcs;
   const soundedPcs = new Set();
   let lowestSoundedPc = null;
 
   for (let i = 0; i < frets.length; i++) {
     const f = frets[i];
     if (f < 0) continue;
-    const pc = (openPcs[i] + f) % 12;
+    const pc = ((openPcs[i] + f + pitchShiftSemitones) % 12 + 12) % 12;
     if (lowestSoundedPc === null) {
       lowestSoundedPc = pc;
     }
@@ -280,8 +430,6 @@ export const suggestChordsForVoicing = (
             Math.round(91 - unplayedAllowedCount * 4 + formula.priority * 0.2)
           );
         } else {
-          // Exact root-position match: 100% when all formula tones are played (e.g. Em7 = 02203x, G5 = 3x003x),
-          // slightly lower (94%) if an optional 5th is omitted.
           confidence = Math.min(
             100,
             Math.round(100 - unplayedAllowedCount * 5)
@@ -349,7 +497,8 @@ export const formatChordSuggestionsText = (suggestions = []) => {
 };
 
 /**
- * Validates that the notes sounded by `frets` on `instrument` harmonically match `chordName`.
+ * Validates that the notes sounded by `frets` on `instrument` (using `customTuningStr` if provided)
+ * harmonically match `chordName`.
  */
 export const validateVoicingHarmony = (
   chordName,
@@ -358,7 +507,8 @@ export const validateVoicingHarmony = (
   bassSemitone,
   frets,
   instrument = 'guitar',
-  rootStr = null
+  rootStr = null,
+  customTuningStr = null
 ) => {
   const expected = getChordExpectedPitchClasses(rootSemitone, quality, bassSemitone);
   if (!expected) {
@@ -366,10 +516,9 @@ export const validateVoicingHarmony = (
   }
 
   const { allowedPcs, requiredPcs } = expected;
-  const openPcs =
-    instrument === 'ukulele' ? UKULELE_OPEN_PITCH_CLASSES : GUITAR_OPEN_PITCH_CLASSES;
-  const strLabels =
-    instrument === 'ukulele' ? UKULELE_STRING_LABELS : GUITAR_STRING_LABELS;
+  const tuningInfo = parseInstrumentTuning(customTuningStr, instrument);
+  const openPcs = tuningInfo.openPcs;
+  const strLabels = tuningInfo.stringLabels;
 
   const soundedPcs = new Set();
   const wrongNotes = [];
@@ -429,11 +578,13 @@ export const validateVoicingHarmony = (
       targetRootSemitone: rootSemitone,
       targetRootStr: rootStr || SHARP_NOTES[rootSemitone],
       maxResults: 3,
+      customTuningStr,
     }).filter((s) => s.chord !== chordName && s.confidence >= 70);
 
     if (suggestions.length === 0 || suggestions[0].confidence < 90) {
       const globalSuggs = suggestChordsForVoicing(frets, instrument, {
         maxResults: 3,
+        customTuningStr,
       }).filter((s) => s.chord !== chordName);
       const seen = new Set(suggestions.map((s) => s.chord));
       for (const gs of globalSuggs) {
@@ -445,20 +596,19 @@ export const validateVoicingHarmony = (
       }
     }
 
+    const tuningNote = tuningInfo.isCustom
+      ? ` [in tuning ${tuningInfo.stringNames.join(' ')}]`
+      : '';
     return {
       valid: false,
       suggestions,
-      error: `Harmonic mismatch in '${chordName}': ${issues.join('; ')}.${formatChordSuggestionsText(suggestions)}`,
+      error: `Harmonic mismatch in '${chordName}'${tuningNote}: ${issues.join('; ')}.${formatChordSuggestionsText(suggestions)}`,
     };
   }
 
   return { valid: true, suggestions: [] };
 };
 
-/**
- * Helper to parse the right-hand fret pattern (`3x003x` or `0212`) before/independent of chord name validation,
- * so even an unknown chord name like `X: 3x003x` can receive fret-based chord recommendations!
- */
 const parseFretPatternRightSide = (rawRightSide = '', explicitInstrument = null, chordNameForMsg = '') => {
   let rightSide = String(rawRightSide || '').trim();
   let label = null;
@@ -526,9 +676,9 @@ const parseFretPatternRightSide = (rawRightSide = '', explicitInstrument = null,
 
 /**
  * Parses and harmonically validates a single plain-text chord fingering definition line
- * inside `## Chords` / `## Fingerings`.
+ * inside `## Chords` / `## Fingerings`, accounting for custom song tuning (`customTuningStr`).
  */
-export const parseFingeringDefinitionLine = (rawLine = '') => {
+export const parseFingeringDefinitionLine = (rawLine = '', customTuningStr = null) => {
   const trimmed = String(rawLine || '').replace(/\s+#.*$/, '').trim();
   if (!trimmed || trimmed.startsWith('#')) {
     return null;
@@ -576,10 +726,12 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
         targetRootSemitone: rootHintSemitone,
         targetRootStr: rootPrefixMatch ? rootPrefixMatch[1] : null,
         maxResults: 3,
+        customTuningStr,
       });
       if (suggestions.length === 0 && rootHintSemitone !== null) {
         suggestions = suggestChordsForVoicing(fretParse.frets, fretParse.instrument, {
           maxResults: 3,
+          customTuningStr,
         });
       }
       suggestionSuffix = formatChordSuggestionsText(suggestions);
@@ -611,7 +763,8 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
     bassSemitone,
     fretParse.frets,
     fretParse.instrument,
-    rootStr
+    rootStr,
+    customTuningStr
   );
   if (!harmonyCheck.valid) {
     return {
@@ -633,9 +786,13 @@ export const parseFingeringDefinitionLine = (rawLine = '') => {
 
 /**
  * Validates `##` sections in a song body (ensuring non-empty headers and valid, harmonically accurate
- * fingering definitions inside `## Chords` / `## Fingerings`).
+ * fingering definitions inside `## Chords` / `## Fingerings`, accounting for `customTuningStr`).
  */
-export const validateMarkdownSections = (bodyContent = '', bodyStartLine = 1) => {
+export const validateMarkdownSections = (
+  bodyContent = '',
+  bodyStartLine = 1,
+  customTuningStr = null
+) => {
   const diagnostics = [];
   const lines = String(bodyContent || '').replace(/\r\n/g, '\n').split('\n');
   let currentSectionType = 'main';
@@ -675,7 +832,7 @@ export const validateMarkdownSections = (bodyContent = '', bodyStartLine = 1) =>
     }
 
     if (currentSectionType === 'fingerings') {
-      const parsed = parseFingeringDefinitionLine(rawLine);
+      const parsed = parseFingeringDefinitionLine(rawLine, customTuningStr);
       if (parsed && !parsed.valid) {
         diagnostics.push({
           line: fileLine,
@@ -755,6 +912,13 @@ export const validateFrontmatter = (frontmatterData, rawFileName = "") => {
   const { isValid, expected } = validateAlphabeticalOrder(keys);
   if (!isValid) {
     errors.push(`Keys are not in alphabetical order. Expected: \n${expected.join('\n')}`);
+  }
+
+  if (frontmatterData.tuning) {
+    const tCheck = parseInstrumentTuning(String(frontmatterData.tuning), 'guitar');
+    if (!tCheck.valid) {
+      errors.push(tCheck.error);
+    }
   }
 
   return errors;
