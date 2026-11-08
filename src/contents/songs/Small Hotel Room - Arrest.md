@@ -79,3 +79,6 @@ Your father and I found out on time
 Em7: 02203x
 G: 32003x
 D/F#: 20023x
+Csus2: x3003x
+D: x5777x
+C: x3555x
