@@ -74,3 +74,6 @@ Arrest you, arrest you, arrest you
 Your father and I found out on time
 
 (Csus2  Csus2_Csus2!  ..)  (Em7_D/G  G)
+
+## Chords
+Em7: 02203x
