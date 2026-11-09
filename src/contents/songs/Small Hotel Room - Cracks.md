@@ -78,3 +78,4 @@ And the shallow end
 ## Chords
 Dmadd9: 055400
 Am7: 7777xx
+X: 334xxx
