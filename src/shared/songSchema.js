@@ -1,13 +1,13 @@
 /**
  * @file src/shared/songSchema.js (in smallhotelroom.github.io)
- * @version 2.11.0
+ * @version 2.11.1
  * Single Source of Truth for Frontmatter Schema, Draconian Case-Sensitive Chord Grammar,
  * Custom Tuning Parser (`parseInstrumentTuning`), Markdown `##` Section & Harmonic
  * Fingering Postures Schema, Reverse Chord Voicing Identification (`suggestChordsForVoicing`),
  * Default Posture Previewer (`getDefaultPostureForChord`), and Syntax Highlighting Palettes.
  */
 
-export const __version__ = '2.11.0';
+export const __version__ = '2.11.1';
 
 export const BASE_REQUIRED_KEYS = [];
 
@@ -252,16 +252,15 @@ export const CHORD_QUALITY_REGEX =
 
 // --- MARKDOWN `##` SECTIONS & PLAIN-TEXT CHORD FINGERING SCHEMA ---
 export const SECTION_HEADER_REGEX = /^##\s+(.+?)\s*$/;
+// Case-insensitive section header match so `## Chords`, `## Fingerings`, etc. are always recognized!
 export const FINGERING_SECTION_HEADER_REGEX =
-  /^(?:chords?|fingerings?|voicings?|postures?|acordes?|posiciones?)$/;
+  /^(?:chords?|fingerings?|voicings?|postures?|acordes?|posiciones?)$/i;
 export const NOTES_SECTION_HEADER_REGEX =
-  /^(?:notes?|notas?|comments?|tabs?|tablature)$/;
+  /^(?:notes?|notas?|comments?|tabs?|tablature)$/i;
 
 /**
  * Canonical chord interval definitions (in semitones above root) for harmonic validation
  * and reverse chord-name identification (`suggestChordsForVoicing`).
- * - `noExtraNotes: true` on `5` ensures power chords are NEVER suggested when a 3rd, 7th, 6th, or 9th is present!
- * - `shellRequired` allows 3rd-less shell voicings on 7th/9th chords (like `Fmaj7: 334xxx` playing `[F, C, E]`).
  */
 export const CHORD_FORMULAS = [
   { suffix: '', aliases: ['M', 'maj'], allowed: [0, 4, 7], required: [0, 4], priority: 10 },
@@ -390,7 +389,6 @@ export const suggestChordsForVoicing = (
       const missingReqCount = requiredArr.length - presentReqCount;
       const unplayedAllowedCount = Math.max(0, allowedSet.size - matchingCount);
 
-      // Disqualify `5` (power chords) immediately if any non-[0,7] color tone (like maj7, 3rd, etc.) is played!
       if (formula.noExtraNotes && wrongCount > 0) continue;
       if (matchingCount === 0 || wrongCount > 1) continue;
       if (targetRootSemitone === null && !soundedPcs.has(rootPc)) continue;
@@ -398,7 +396,7 @@ export const suggestChordsForVoicing = (
       const bassMatchesRoot = lowestSoundedPc === rootPc;
       let chordLabel = `${rootName}${formula.suffix}`;
       let confidence = 0;
-      let tier = 0; // 3 = exact root match, 2 = zero-wrong-note shell/subset match, 1 = near match
+      let tier = 0;
 
       if (wrongCount === 0 && missingReqCount === 0) {
         if (instrument === 'guitar' && !bassMatchesRoot && lowestSoundedPc !== null) {
@@ -416,7 +414,6 @@ export const suggestChordsForVoicing = (
           tier = 3;
         }
       } else if (wrongCount === 0 && missingReqCount === 1 && soundedPcs.has(rootPc)) {
-        // Zero wrong notes, only 1 omitted chord tone (e.g. 3rd-less shell voicing `Fmaj7: 334xxx` playing F-C-E)
         const hasShellReq =
           formula.shellRequired &&
           formula.shellRequired.every((iv) => soundedPcs.has((rootPc + iv) % 12));
@@ -486,7 +483,6 @@ export const formatChordSuggestionsText = (suggestions = []) => {
   return ` Did you mean: ${listStr}?`;
 };
 
-// --- DEFAULT CHORD POSTURE GENERATOR (For "Chord: " Empty-Right-Side Linter Hint) ---
 const DEFAULT_GUITAR_OPEN_SHAPES = {
   '0:': [-1, 3, 2, 0, 1, 0],
   '0:7': [-1, 3, 2, 3, 1, 0],
@@ -527,10 +523,6 @@ export const formatFretsCompact = (frets = []) => {
     .join(needsSpaces ? ' ' : '');
 };
 
-/**
- * Computes a playable default fret posture for `chordName` on `instrument`,
- * both in standard tuning and (if `customTuningStr` is provided) in the custom tuning!
- */
 export const getDefaultPostureForChord = (
   rootSemitone,
   rawQuality = '',
@@ -546,9 +538,7 @@ export const getDefaultPostureForChord = (
   const expected = getChordExpectedPitchClasses(rootSemitone, rawQuality, bassSemitone);
   if (!expected) return null;
 
-  // Helper to solve a compact voicing on any openPcs array
   const solveForOpenPcs = (openPcs) => {
-    // 1. Check standard open overrides if standard guitar tuning
     if (
       instrument === 'guitar' &&
       openPcs.every((pc, i) => pc === GUITAR_OPEN_PITCH_CLASSES[i]) &&
@@ -560,7 +550,6 @@ export const getDefaultPostureForChord = (
       }
     }
 
-    // 2. Search low-fret windows (startFret 0..7) for the most playable shape
     let bestFrets = null;
     let bestScore = -999;
 
@@ -570,7 +559,6 @@ export const getDefaultPostureForChord = (
 
       for (let s = 0; s < openPcs.length; s++) {
         const strPc = openPcs[s];
-        // Find frets in [0] or [base .. base + 3] that produce an allowed pitch class
         const options = [];
         for (let f = 0; f <= base + 3; f++) {
           if (f !== 0 && f < base) continue;
@@ -595,7 +583,6 @@ export const getDefaultPostureForChord = (
         if (options.length === 0) {
           candidate.push(-1);
         } else {
-          // Prefer open string or lowest fret in window
           options.sort((a, b) => a.f - b.f);
           candidate.push(options[0].f);
           if (options[0].pc === targetBass) bassFound = true;
@@ -646,10 +633,6 @@ export const getDefaultPostureForChord = (
   };
 };
 
-/**
- * Validates that the notes sounded by `frets` on `instrument` (using `customTuningStr` if provided)
- * harmonically match `chordName`.
- */
 export const validateVoicingHarmony = (
   chordName,
   rootSemitone,
@@ -704,8 +687,6 @@ export const validateVoicingHarmony = (
     );
   }
 
-  // If wrongNotes is empty and the chord supports a 3rd-less shell voicing (e.g. Fmaj7: 334xxx playing F-C-E),
-  // accept it when all shellRequiredPcs (root + characteristic 7th/9th) are present!
   const satisfiesShellVoicing =
     wrongNotes.length === 0 &&
     shellRequiredPcs &&
@@ -833,12 +814,6 @@ const parseFretPatternRightSide = (rawRightSide = '', explicitInstrument = null,
   };
 };
 
-/**
- * Parses and harmonically validates a single plain-text chord fingering definition line
- * inside `## Chords` / `## Fingerings`, accounting for custom song tuning (`customTuningStr`).
- * - Supports typing `X: 334xxx` (or `X 334xxx` without colon) to get top 3 chord name suggestions!
- * - Supports typing `Chord:` (with empty right side) to preview the default posture!
- */
 export const parseFingeringDefinitionLine = (rawLine = '', customTuningStr = null) => {
   const trimmed = String(rawLine || '').replace(/\s+#.*$/, '').trim();
   if (!trimmed || trimmed.startsWith('#')) {
@@ -850,7 +825,6 @@ export const parseFingeringDefinitionLine = (rawLine = '', customTuningStr = nul
   let rightSide = '';
 
   if (colonIdx === -1) {
-    // Also support space-separated `X 334xxx` without a colon so quick queries still get suggestions!
     const spaceMatch = /^(\S+)\s+(.+)$/.exec(trimmed);
     if (spaceMatch) {
       const candidateRight = parseFretPatternRightSide(spaceMatch[2], null, spaceMatch[1]);
@@ -893,7 +867,6 @@ export const parseFingeringDefinitionLine = (rawLine = '', customTuningStr = nul
     findChordFormula(chordMatch[2] || '') !== null &&
     (!chordMatch[3] || NOTE_TO_SEMITONE[chordMatch[3]] !== undefined);
 
-  // Feature 2: User typed `Chord:` with an empty right side -> preview default posture!
   if (!rightSide) {
     if (!isChordSyntaxValid) {
       return {
@@ -1007,10 +980,6 @@ export const parseFingeringDefinitionLine = (rawLine = '', customTuningStr = nul
   };
 };
 
-/**
- * Validates `##` sections in a song body (ensuring non-empty headers and valid, harmonically accurate
- * fingering definitions inside `## Chords` / `## Fingerings`, accounting for `customTuningStr`).
- */
 export const validateMarkdownSections = (
   bodyContent = '',
   bodyStartLine = 1,
