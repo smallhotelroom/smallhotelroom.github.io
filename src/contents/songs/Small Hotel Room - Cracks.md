@@ -13,7 +13,7 @@ tuning: -2 0 -2 -2 -2 0
 url: https://smallhotelroom.com
 youtube: eHYG4pLRcsI
 ---
-(Dmadd9  Am7)
+(Dmadd9  Am7  Fmaj7)
 Lord, have no respect for me
 I have much more than I deserve
 Remind me that when I′m like you
@@ -78,4 +78,4 @@ And the shallow end
 ## Chords
 Dmadd9: 055400
 Am7: 7777xx
-X: 334xxx
+Fmaj7: 334xxx
