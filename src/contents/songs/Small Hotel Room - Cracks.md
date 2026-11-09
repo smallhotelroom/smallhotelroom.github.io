@@ -9,9 +9,11 @@ license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 musicians: Juan G Victores, Tres De Septiembre (Guitars)
 spotify: 7tLUQbnCmOI0ZOkjOixrPp
 track: 1
+tuning: -2 0 -2 -2 -2 0
 url: https://smallhotelroom.com
 youtube: eHYG4pLRcsI
 ---
+(Dmadd9  Am7)
 Lord, have no respect for me
 I have much more than I deserve
 Remind me that when I′m like you
@@ -72,3 +74,7 @@ Tied to hold me down
 Still could smell her sweat
 Between the bitter taste
 And the shallow end
+
+## Chords
+Dmadd9: 055400
+Am7: 7777xx
