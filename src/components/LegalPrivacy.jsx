@@ -1,4 +1,4 @@
-/* v1.0.0 */
+/* v1.1.0 */
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ObfuscatedEmail from './ObfuscatedEmail';
@@ -55,7 +55,19 @@ const LegalPrivacy = () => {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold text-white border-b border-gray-700 pb-2">4. User Rights</h2>
+        <h2 className="text-2xl font-semibold text-white border-b border-gray-700 pb-2">4. Small Hotel Room Application (Android, Desktop & Web)</h2>
+        <p>
+          The <strong>Small Hotel Room</strong> application (<code>com.smallhotelroom.app</code>) is a free, open-source, offline music and songbook tool distributed via Google Play, GitHub Releases, and the web.
+        </p>
+        <ul className="list-disc list-inside space-y-2">
+          <li><strong>Zero Data Collection:</strong> The application operates completely offline on your device. It does not collect, transmit, store on external servers, or share any personal or sensitive user data, usage analytics, device identifiers, location data, or crash reports.</li>
+          <li><strong>Local Device Storage:</strong> User preferences (such as instrument selection, tuning, or metronome settings) and any optional SQLite (<code>.db</code>) songbook packs imported by the user are stored strictly locally on the user&apos;s device (via <code>localStorage</code> and <code>IndexedDB</code>) and never leave the device.</li>
+          <li><strong>No Ads or Third-Party SDKs:</strong> The application contains no advertisements, no in-app purchases, and no third-party tracking SDKs. External links (such as optional links to external music platforms or websites in song metadata) open in your device&apos;s default browser or external app only when explicitly tapped by you.</li>
+        </ul>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold text-white border-b border-gray-700 pb-2">5. User Rights</h2>
         <p>
           Under the GDPR, you have the right to access, rectify, or erase your data, as well as restrict or object to its processing. Since we do not retain a database of user information, any requests related to data processed via donations should be directed to PayPal. For direct inquiries, please contact us at the email provided above.
         </p>
