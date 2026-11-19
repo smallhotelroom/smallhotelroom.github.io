@@ -1,6 +1,15 @@
 ---
+album: Summer 2011
+author: Juan G Victores
 bpm: 80
+isrc: USE830956042
+lang: English
+license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+musicians: Juan G Victores (Voice, Guitars), Paco Dicenta (Bass Guitar, Additional
+  Guitars, Mixing, Recording, Mastering), Leandro Deltell (Drums)
 spotify: 3X7mNuccNIBjiBeI2Fgbya
+track: 9
+url: https://smallhotelroom.com
 ---
 
 (E)
