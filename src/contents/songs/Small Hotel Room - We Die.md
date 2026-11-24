@@ -37,14 +37,47 @@ We die within ourselves. Every night I get covered with weed.
 The shipwreck's in the head, the troops are marching in,
 and I still can hear them calling...
 
+(Bm7/F  Bdim/F!  E7sus4  Em7)  (Bm7/F  Bdim/F!  Em7!  Em7)
+(Bm7/F  Bdim/F!  E7sus4  Em7)  (Bm7/F  Bdim/F!  Em7!  Em7)
+
+(Em  Em  Em  Em)  (C  C  C  C)
 We die within ourselves. Every night I get covered with weeds.
+(Em  Em  Em  Em)  (C  C  C  C)
 Ant's dive. I crucify. In My name.
 
+(F#m7  F#m7  Bm7/F  Bm7/F)  (Em  Em  Em  Em)
 The child has no escape from here.
+(F#m7  F#m7  Bm7/F  Bm7/F)  (Em  Em  Em  Em)
 Her womb is always dark [inside].
+(F#m7  F#m7  Bm7/F  Bm7/F)  (Em  Em  Em  Em)
 Angry child sees her mother recognize her mistake
-and hides the scene deep in mind.
+(F#m7  F#m7  Bm7/F  Bm7/F)  (Em!  ..)  (Em!  ..  ..  ..)
+and hides the scene, deep in mind.
 
-We die... We die. Every single night I get covered in weeds.
+(Em!  ..  ..  ..)
+[We die...]
+
+(Em  Em  Em  Em)  (C  C  C  C)
+We die! We die!
+(Em  Em  Em  Em)  (C  C  C  C)
+[We die...] We die!
+[Every single night I get covered in weed]
+[Every single night I get covered in weed]
+(Em  Em  Em  Em)  (C  C  C  C)
+[We die...] We die!
+[Every single night I get covered in weed]
+[Every single night I get covered in weed]
+(Em  Em  Em  Em)  (C  C  C  C)
+... We die!
+[Every single night I get covered in weed]
+[Every single night I get covered in weed]
+
+(Em!  Em!  Em!  Em!)  (C  C  C  C)
+(Em  Em  Em  Em)  (C  C  C  C)
+(Em!  ..  ..  ..)
 
 ## Chords
+Bm7/F: 1202xx
+Bdim/F: 1204xx
+E7sus4: 0202xx
+F#m7: 2022xx
