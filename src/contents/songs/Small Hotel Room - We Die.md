@@ -1,7 +1,8 @@
 ---
 album: We Die
 author: Juan G Victores
-bpm: 100
+bpm: 200
+capo: 3
 featuring: Tres De Septiembre
 isrc: QZPJ32443426
 lang: English
@@ -12,18 +13,27 @@ track: 1
 url: https://smallhotelroom.com
 youtube: M7JLpJNAW9w
 ---
+(Em  D/F#  G  F)  (Em  D/F#  G!  ..)
+
+(Em  D/F#  G  F)  (Em  D/F#  G  F)
 We die. Struggle out.
 Lay there lying. Ways to forget.
+(Em  D/F#  G  F)  (Em  D/F#  G  F)
 We don't know the way to recede.
 Lean back. Walk the curves.
+(Em  D/F#  G  F)  (Em  D/F#  G  F)  (Em  Em  Em  Em)
 Maybe someone inspired you.
 Have you lost her? Do you treat her well?
 
+(Em  Em  Em  Em)  (C  C  C  C)
 We die within ourselves. Every night we get covered with weed.
+(Am  Am  Am  Am)  (Em  Em  Em  Em)
 The shipwreck's in the head, the traincrash as we sleep,
 and I still can hear the sirens...
 
+(Em  Em  Em  Em)  (C  C  C  C)
 We die within ourselves. Every night I get covered with weed.
+(Am  Am  Am  Am)  (Em  Em  Em  Em)
 The shipwreck's in the head, the troops are marching in,
 and I still can hear them calling...
 
@@ -36,3 +46,5 @@ Angry child sees her mother recognize her mistake
 and hides the scene deep in mind.
 
 We die... We die. Every single night I get covered in weeds.
+
+## Chords
