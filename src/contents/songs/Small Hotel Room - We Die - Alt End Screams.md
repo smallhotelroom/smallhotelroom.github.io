@@ -2,6 +2,7 @@
 album: We Die
 author: Juan G Victores
 bpm: 100
+duration: 3:51
 featuring: Tres De Septiembre
 isrc: QZPJ32443427
 lang: English

@@ -2,6 +2,7 @@
 album: Cracks
 author: Juan G Victores
 bpm: 124
+duration: 3:23
 featuring: Tres De Septiembre
 isrc: QZPJ32526652
 lang: English
