@@ -5,6 +5,7 @@ bpm: 117
 downloads:
 - label: mp3
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/energy/Small-Hotel-Room-08-Energy.mp3?format=raw
+duration: 3:10
 isrc: USE830956041
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

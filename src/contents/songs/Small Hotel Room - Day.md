@@ -5,6 +5,7 @@ bpm: 98.5
 downloads:
 - label: mp3
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/day/Small-Hotel-Room-05-Day.mp3?format=raw
+duration: 3:46
 isrc: USE830956038
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

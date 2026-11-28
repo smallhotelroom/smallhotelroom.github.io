@@ -5,6 +5,7 @@ bpm: 72
 downloads:
 - label: mp3
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/moon/Small-Hotel-Room-03-Moon.mp3?format=raw
+duration: 4:11
 isrc: USE830956036
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

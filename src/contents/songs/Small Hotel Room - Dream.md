@@ -5,6 +5,7 @@ bpm: 140
 downloads:
 - label: mp3
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/dream/Small-Hotel-Room-06-Dream.mp3?format=raw
+duration: 4:57
 isrc: USE830956039
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

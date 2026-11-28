@@ -10,6 +10,7 @@ downloads:
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/north/Small-Hotel-Room-04-North.mp3?format=raw
 - label: mp3 (unplugged)
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/north/Small-Hotel-Room-North-unplugged.mp3?format=raw
+duration: 2:54
 isrc: USE830956037
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

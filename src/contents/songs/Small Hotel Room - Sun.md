@@ -5,6 +5,7 @@ bpm: 94
 downloads:
 - label: mp3
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/sun/Small-Hotel-Room-02-Sun.mp3?format=raw
+duration: 4:01
 isrc: USE830956035
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

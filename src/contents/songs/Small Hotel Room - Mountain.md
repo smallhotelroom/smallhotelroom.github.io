@@ -5,6 +5,7 @@ bpm: 76
 downloads:
 - label: mp3
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/mountain/Small-Hotel-Room-01-Mountain.mp3?format=raw
+duration: 5:37
 isrc: USE830956034
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

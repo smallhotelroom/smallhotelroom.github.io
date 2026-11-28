@@ -5,6 +5,7 @@ bpm: 109
 downloads:
 - label: mp3
   url: https://sourceforge.net/p/tablaturevalley/code/HEAD/tree/smallhotelroom/travelling/Small-Hotel-Room-07-Travelling.mp3?format=raw
+duration: 2:49
 isrc: USE830956040
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

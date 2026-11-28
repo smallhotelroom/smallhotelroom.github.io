@@ -2,6 +2,7 @@
 album: Summer 2011
 author: Juan G Victores
 bpm: 80
+duration: 2:30
 isrc: USE830956042
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
