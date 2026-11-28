@@ -3,6 +3,7 @@ album: Summer 2021
 author: Juan G Victores
 bpm: 130
 capo: 2
+duration: 4:08
 isrc: QZPJ32186129
 lang: English
 license: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

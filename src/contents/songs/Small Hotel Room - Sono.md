@@ -2,6 +2,7 @@
 album: Summer 2021
 author: Juan G Victores
 bpm: 102
+duration: 4:09
 featuring: Tres De Septiembre
 isrc: QZPJ32186126
 lang: English

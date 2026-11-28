@@ -2,6 +2,7 @@
 album: Summer 2021
 author: Juan G Victores, Jennifer J Gago
 bpm: 0
+duration: 1:53
 featuring: JENN J
 isrc: QZPJ32186135
 lang: English
